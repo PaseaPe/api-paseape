@@ -82,14 +82,25 @@ jobs:
             $COMPOSE_CMD down
             $COMPOSE_CMD up -d --remove-orphans
 
-      - name: Smoke Test (Validacion HTTP 200 en Vivo)
+      - name: Smoke Test (Validacion HTTP 200 con Sondeo Continuo)
         run: |
-          echo "Esperando 15 segundos para la inicializacion del contenedor Spring Boot..."
-          sleep 15
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.OCI_HOST }}:7001/api-paseape/health || true)
-          echo "Respuesta HTTP recibida: $HTTP_STATUS"
-          if [ "$HTTP_STATUS" -ne 200 ]; then
-            echo "ERROR CRITICO: El servicio no respondio HTTP 200 tras el despliegue."
-            exit 1
-          fi
-          echo "Despliegue a produccion verificado y operativo."
+          echo "Iniciando sondeo de disponibilidad sobre la API de produccion..."
+          URL="http://${{ secrets.OCI_HOST }}:7001/api-paseape/health"
+          MAX_ATTEMPTS=20
+          SLEEP_SECONDS=3
+          HTTP_STATUS=0
+
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
+            echo "Intento $i/$MAX_ATTEMPTS: Codigo HTTP recibido = $HTTP_STATUS"
+          
+            if [ "$HTTP_STATUS" -eq 200 ]; then
+              echo "Servicio operativo y respondiendo HTTP 200 exitosamente."
+              exit 0
+            fi
+          
+            sleep $SLEEP_SECONDS
+          done
+
+          echo "ERROR CRITICO: El servicio no respondio HTTP 200 tras $((MAX_ATTEMPTS * SLEEP_SECONDS)) segundos."
+          exit 1
