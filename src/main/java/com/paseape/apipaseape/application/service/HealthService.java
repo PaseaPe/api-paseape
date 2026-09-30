@@ -1,8 +1,7 @@
 package com.paseape.apipaseape.application.service;
 
-import com.paseape.apipaseape.application.dto.response.DatabaseHealthResponse;
-import com.paseape.apipaseape.application.dto.response.HealthResponse;
-import com.paseape.apipaseape.application.port.in.HealthCheckUseCase;
+import com.paseape.apipaseape.infrastructure.dto.response.DatabaseHealthResponse;
+import com.paseape.apipaseape.infrastructure.dto.response.HealthResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -15,7 +14,7 @@ import java.time.ZonedDateTime;
 
 @Service
 @RequiredArgsConstructor
-public class HealthCheckService implements HealthCheckUseCase {
+public class HealthService {
 
     private static final String ZONE_LIMA = "America/Lima";
     private static final String SERVICE_NAME = "api-paseape";
@@ -26,9 +25,8 @@ public class HealthCheckService implements HealthCheckUseCase {
 
     private final DataSource dataSource;
 
-    @Override
-    public HealthResponse execute() {
-        DatabaseHealthResponse dbStatus = checkDatabaseConnection();
+    public HealthResponse checkHealth() {
+        DatabaseHealthResponse dbStatus = evaluateDatabaseHealth();
         String overallStatus = STATUS_UP.equals(dbStatus.getStatus()) ? STATUS_UP : STATUS_DOWN;
 
         return HealthResponse.builder()
@@ -41,12 +39,12 @@ public class HealthCheckService implements HealthCheckUseCase {
                 .build();
     }
 
-    private DatabaseHealthResponse checkDatabaseConnection() {
+    private DatabaseHealthResponse evaluateDatabaseHealth() {
         try (Connection connection = dataSource.getConnection();
-             PreparedStatement statement = connection.prepareStatement(VALIDATION_QUERY);
-             ResultSet resultSet = statement.executeQuery()) {
+             PreparedStatement stmt = connection.prepareStatement(VALIDATION_QUERY);
+             ResultSet rs = stmt.executeQuery()) {
 
-            if (resultSet.next()) {
+            if (rs.next()) {
                 return DatabaseHealthResponse.builder()
                         .status(STATUS_UP)
                         .database("Aiven MySQL (TLS)")
@@ -56,7 +54,7 @@ public class HealthCheckService implements HealthCheckUseCase {
             return DatabaseHealthResponse.builder()
                     .status(STATUS_DOWN)
                     .database("Aiven MySQL (TLS)")
-                    .error("Query did not return results")
+                    .error("Query SELECT 1 did not return rows")
                     .build();
 
         } catch (Exception ex) {

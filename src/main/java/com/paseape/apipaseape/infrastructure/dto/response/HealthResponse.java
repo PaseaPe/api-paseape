@@ -1,4 +1,4 @@
-package com.paseape.apipaseape.application.dto.response;
+package com.paseape.apipaseape.infrastructure.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

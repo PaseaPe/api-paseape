@@ -1,7 +1,7 @@
-package com.paseape.apipaseape.infrastructure.adapter.in.web.controller;
+package com.paseape.apipaseape.infrastructure.controller;
 
-import com.paseape.apipaseape.application.dto.response.HealthResponse;
-import com.paseape.apipaseape.application.port.in.HealthCheckUseCase;
+import com.paseape.apipaseape.application.service.HealthService;
+import com.paseape.apipaseape.infrastructure.dto.response.HealthResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -12,11 +12,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class HealthController {
 
-    private final HealthCheckUseCase healthCheckUseCase;
+    private final HealthService healthService;
 
     @GetMapping("/health")
-    public ResponseEntity<HealthResponse> getHealth() {
-        HealthResponse response = healthCheckUseCase.execute();
+    public ResponseEntity<HealthResponse> checkHealth() {
+        HealthResponse response = healthService.checkHealth();
         if ("UP".equalsIgnoreCase(response.getStatus())) {
             return ResponseEntity.ok(response);
         }
