@@ -1,0 +1,83 @@
+name: CI/CD Pipeline - PaseaPe API (Production)
+
+on:
+  push:
+    branches:
+      - production
+
+jobs:
+  build-and-package:
+    name: 1. Compilación Gradle & Empaquetado JAR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 21 (Eclipse Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Asignar permisos de ejecución al Gradle Wrapper
+        run: chmod +x ./gradlew
+
+      - name: Compilar y empaquetar Spring Boot JAR (sin tests unitarios pesados)
+        run: ./gradlew bootJar --no-daemon -x test
+
+      - name: Subir artefacto compilado para la etapa de despliegue
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-paseape-jar
+          path: build/libs/*.jar
+          retention-days: 1
+
+  deploy-to-oci:
+    name: 2. Despliegue Continuo a Oracle Cloud
+    needs: build-and-package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar artefacto compilado
+        uses: actions/download-artifact@v4
+        with:
+          name: api-paseape-jar
+          path: build/libs
+
+      - name: Configurar llave SSH para OCI
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.OCI_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.OCI_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Transferir JAR al servidor vía SCP
+        run: |
+          JAR_FILE=$(ls build/libs/*.jar | head -n 1)
+          scp -i ~/.ssh/id_rsa "$JAR_FILE" ${{ secrets.OCI_USERNAME }}@${{ secrets.OCI_HOST }}:/home/ubuntu/paseape/app.jar
+
+      - name: Reiniciar Contenedor Docker Compose en OCI
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USERNAME }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/paseape
+            # Docker Compose recarga automáticamente las variables del archivo .env existente en el servidor
+            docker-compose down
+            docker-compose up -d --remove-orphans
+
+      - name: Smoke Test (Health Check de Producción)
+        run: |
+          echo "Esperando 12 segundos a que Spring Boot 3 levante..."
+          sleep 12
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.OCI_HOST }}:7001/api-paseape/health || true)
+          echo "Código HTTP recibido: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "ERROR: La API no respondió HTTP 200 en el endpoint de salud."
+            exit 1
+          fi
+          echo "Despliegue a producción completado y verificado."
