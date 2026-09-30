@@ -6,64 +6,37 @@ on:
       - production
 
 jobs:
-  build-and-package:
-    name: 1. Compilacion Gradle & Empaquetado JAR
+  build-and-deploy:
+    name: Compilacion y Despliegue Continuo (OCI Multi-Arch)
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout del codigo fuente
         uses: actions/checkout@v4
 
-      - name: Configurar Java 21 (Eclipse Temurin)
+      - name: Configurar Java 21 (Temurin)
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '21'
-          cache: 'gradle'
+          distribution: "temurin"
+          java-version: "21"
+          cache: "gradle"
 
-      - name: Asignar permisos de ejecucion al Gradle Wrapper
-        run: chmod +x ./gradlew
-
-      - name: Compilar y empaquetar Spring Boot JAR
-        run: ./gradlew bootJar --no-daemon -x test
-
-      - name: Subir artefacto compilado
-        uses: actions/upload-artifact@v4
-        with:
-          name: api-paseape-jar
-          path: build/libs/*.jar
-          retention-days: 1
-
-  deploy-to-oci:
-    name: 2. Despliegue Continuo a Oracle Cloud
-    needs: build-and-package
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Descargar artefacto compilado
-        uses: actions/download-artifact@v4
-        with:
-          name: api-paseape-jar
-          path: build/libs
-
-      - name: Configurar llaves SSH y Known Hosts
+      - name: Compilar artefacto Spring Boot JAR
         run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          cat << 'EOF' > ~/.ssh/id_rsa
-          ${{ secrets.OCI_SSH_KEY }}
-          EOF
-          sed -i -e '$a\' ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.OCI_HOST }} >> ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
+          chmod +x ./gradlew
+          ./gradlew bootJar --no-daemon -x test
 
-      - name: Transferir nuevo JAR hacia OCI via SCP
-        run: |
-          JAR_FILE=$(ls build/libs/*.jar | head -n 1)
-          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=accept-new "$JAR_FILE" ${{ secrets.OCI_USERNAME }}@${{ secrets.OCI_HOST }}:/home/ubuntu/paseape/app.jar
+      - name: Transferir JAR a OCI via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USERNAME }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          source: "build/libs/*.jar"
+          target: "/home/ubuntu/paseape"
+          strip_components: 2
 
-      - name: Reiniciar Contenedor Docker Compose en OCI
+      - name: Actualizar app.jar y reiniciar contenedor Docker
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.OCI_HOST }}
@@ -71,36 +44,21 @@ jobs:
           key: ${{ secrets.OCI_SSH_KEY }}
           script: |
             cd /home/ubuntu/paseape
-            # Deteccion automatica: Compose V2 nativo o fallback a Compose V1
-            if docker compose version >/dev/null 2>&1; then
-              COMPOSE_CMD="docker compose"
-            else
-              COMPOSE_CMD="docker-compose"
-            fi
-            
-            echo "Ejecutando despliegue con: $COMPOSE_CMD"
-            $COMPOSE_CMD down
-            $COMPOSE_CMD up -d --remove-orphans
+            # Renombrar el artefacto recibido al nombre estandar montado por compose
+            mv -f *.jar app.jar
 
-      - name: Smoke Test (Validacion HTTP 200 con Sondeo Continuo)
+            # Recrear el contenedor con cero tiempo muerto de red
+            docker compose up -d --force-recreate --remove-orphans
+
+      - name: Smoke Test (Healthcheck en Vivo con reintentos nativos)
         run: |
-          echo "Iniciando sondeo de disponibilidad sobre la API de produccion..."
-          URL="http://${{ secrets.OCI_HOST }}:7001/api-paseape/health"
-          MAX_ATTEMPTS=20
-          SLEEP_SECONDS=3
-          HTTP_STATUS=0
-
-          for i in $(seq 1 $MAX_ATTEMPTS); do
-            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL" || true)
-            echo "Intento $i/$MAX_ATTEMPTS: Codigo HTTP recibido = $HTTP_STATUS"
-          
-            if [ "$HTTP_STATUS" -eq 200 ]; then
-              echo "Servicio operativo y respondiendo HTTP 200 exitosamente."
-              exit 0
-            fi
-          
-            sleep $SLEEP_SECONDS
-          done
-
-          echo "ERROR CRITICO: El servicio no respondio HTTP 200 tras $((MAX_ATTEMPTS * SLEEP_SECONDS)) segundos."
-          exit 1
+          echo "Ejecutando verificacion de disponibilidad en produccion..."
+          # Reintenta cada 3 segundos hasta por 60 segundos buscando HTTP 200
+          curl --fail \
+               --retry 20 \
+               --retry-delay 3 \
+               --retry-connrefused \
+               --silent \
+               --show-error \
+               "http://${{ secrets.OCI_HOST }}:7001/api-paseape/health"
+          echo "Servicio PaseaPe API desplegado y respondiendo HTTP 200 OK."
