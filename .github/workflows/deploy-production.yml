@@ -71,12 +71,20 @@ jobs:
           key: ${{ secrets.OCI_SSH_KEY }}
           script: |
             cd /home/ubuntu/paseape
-            docker-compose down
-            docker-compose up -d --remove-orphans
+            # Deteccion automatica: Compose V2 nativo o fallback a Compose V1
+            if docker compose version >/dev/null 2>&1; then
+              COMPOSE_CMD="docker compose"
+            else
+              COMPOSE_CMD="docker-compose"
+            fi
+            
+            echo "Ejecutando despliegue con: $COMPOSE_CMD"
+            $COMPOSE_CMD down
+            $COMPOSE_CMD up -d --remove-orphans
 
       - name: Smoke Test (Validacion HTTP 200 en Vivo)
         run: |
-          echo "Esperando 15 segundos para la inicializacion del contenedor..."
+          echo "Esperando 15 segundos para la inicializacion del contenedor Spring Boot..."
           sleep 15
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.OCI_HOST }}:7001/api-paseape/health || true)
           echo "Respuesta HTTP recibida: $HTTP_STATUS"
