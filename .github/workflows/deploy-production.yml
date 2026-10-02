@@ -21,7 +21,7 @@ jobs:
           java-version: "21"
           cache: "gradle"
 
-      - name: Compilar artefacto Spring Boot JAR (Forzando JVM en UTC)
+      - name: Compilar artefacto Spring Boot JAR (Entorno UTC)
         env:
           JAVA_TOOL_OPTIONS: "-Duser.timezone=UTC"
           TZ: "UTC"
@@ -54,7 +54,7 @@ jobs:
           target: "/home/ubuntu/paseape"
           strip_components: 1
 
-      - name: Apagado forzado, purga de JARs viejos y arranque en UTC
+      - name: Apagado forzado, purga de JARs viejos y arranque determinista en UTC
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.OCI_HOST }}
@@ -81,20 +81,24 @@ jobs:
             chmod 644 app.jar
             ls -lh app.jar
 
-            echo "=== 5. Sincronizando zona horaria UTC en .env del host ==="
+            echo "=== 5. Normalizando variables de zona horaria en .env remoto ==="
             if [ -f .env ]; then
               sed -i 's/^TZ=.*/TZ=UTC/' .env
+              # Eliminar comillas dobles residuales de JAVA_TOOL_OPTIONS para evitar fallos de interpretacion en Docker
+              sed -i 's/^JAVA_TOOL_OPTIONS=.*/JAVA_TOOL_OPTIONS=-Duser.timezone=UTC/' .env
               grep -q "^TZ=" .env || echo "TZ=UTC" >> .env
+              grep -q "^JAVA_TOOL_OPTIONS=" .env || echo "JAVA_TOOL_OPTIONS=-Duser.timezone=UTC" >> .env
             else
               echo "TZ=UTC" > .env
+              echo "JAVA_TOOL_OPTIONS=-Duser.timezone=UTC" >> .env
             fi
 
-            echo "=== 6. Levantando servicio con Docker Compose forzando UTC ==="
+            echo "=== 6. Levantando servicio inyectando UTC al entorno de Docker ==="
             TZ=UTC \
-            JAVA_TOOL_OPTIONS="-Duser.timezone=UTC" \
+            JAVA_TOOL_OPTIONS=-Duser.timezone=UTC \
             docker compose up -d --force-recreate --remove-orphans
 
-            echo "=== 7. Registro de arranque y verificacion de flags ==="
+            echo "=== 7. Registro de arranque del contenedor ==="
             sleep 5
             docker compose logs --tail=40
 
