@@ -21,7 +21,10 @@ jobs:
           java-version: "21"
           cache: "gradle"
 
-      - name: Compilar artefacto Spring Boot JAR
+      - name: Compilar artefacto Spring Boot JAR (Forzando JVM en UTC)
+        env:
+          JAVA_TOOL_OPTIONS: "-Duser.timezone=UTC"
+          TZ: "UTC"
         run: |
           chmod +x ./gradlew
           ./gradlew clean bootJar -x jar --no-daemon -x test
@@ -51,7 +54,7 @@ jobs:
           target: "/home/ubuntu/paseape"
           strip_components: 1
 
-      - name: Apagado forzado, purga de JARs viejos y arranque
+      - name: Apagado forzado, purga de JARs viejos y arranque en UTC
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.OCI_HOST }}
@@ -70,8 +73,7 @@ jobs:
               exit 1
             fi
 
-            echo "=== 3. Purgando todos los archivos JAR anteriores ==="
-            # Elimina cualquier .jar existente excepto el archivo que se acaba de transferir
+            echo "=== 3. Purgando archivos JAR anteriores ==="
             find . -maxdepth 1 -name "*.jar*" ! -name "app.jar.deploy" -type f -exec rm -vf {} +
 
             echo "=== 4. Asignando el nuevo binario a app.jar ==="
@@ -79,14 +81,22 @@ jobs:
             chmod 644 app.jar
             ls -lh app.jar
 
-            echo "=== 5. Levantando servicio con Docker Compose en UTC ==="
-            export TZ=UTC
-            export JAVA_TOOL_OPTIONS="-Duser.timezone=UTC"
+            echo "=== 5. Sincronizando zona horaria UTC en .env del host ==="
+            if [ -f .env ]; then
+              sed -i 's/^TZ=.*/TZ=UTC/' .env
+              grep -q "^TZ=" .env || echo "TZ=UTC" >> .env
+            else
+              echo "TZ=UTC" > .env
+            fi
+
+            echo "=== 6. Levantando servicio con Docker Compose forzando UTC ==="
+            TZ=UTC \
+            JAVA_TOOL_OPTIONS="-Duser.timezone=UTC" \
             docker compose up -d --force-recreate --remove-orphans
 
-            echo "=== 6. Registro de arranque del contenedor ==="
-            sleep 4
-            docker compose logs --tail=30
+            echo "=== 7. Registro de arranque y verificacion de flags ==="
+            sleep 5
+            docker compose logs --tail=40
 
       - name: Smoke Test (Healthcheck en Vivo con reintentos nativos)
         run: |
