@@ -24,7 +24,24 @@ jobs:
       - name: Compilar artefacto Spring Boot JAR
         run: |
           chmod +x ./gradlew
-          ./gradlew bootJar --no-daemon -x test
+          # Limpia build anterior y evita generar el -plain.jar (-x jar)
+          ./gradlew clean bootJar -x jar --no-daemon -x test
+
+      - name: Validar empaquetado de migraciones Flyway
+        run: |
+          echo "=== Verificando scripts SQL en el JAR ==="
+          JAR_FILE=$(ls build/libs/*.jar | grep -v 'plain' | head -n 1)
+          echo "Inspeccionando: $JAR_FILE"
+          jar tf "$JAR_FILE" | grep -E "BOOT-INF/classes/db/migration/.*\.sql" || {
+            echo "ERROR CRITICO: No se encontraron scripts de migracion SQL dentro del JAR compilado."
+            exit 1
+          }
+
+      - name: Preparar artefacto para despliegue
+        run: |
+          JAR_FILE=$(ls build/libs/*.jar | grep -v 'plain' | head -n 1)
+          # Renombrar localmente a un nombre temporal predecible
+          cp "$JAR_FILE" build/libs/app.jar.new
 
       - name: Transferir JAR a OCI via SCP
         uses: appleboy/scp-action@v0.1.7
@@ -32,7 +49,7 @@ jobs:
           host: ${{ secrets.OCI_HOST }}
           username: ${{ secrets.OCI_USERNAME }}
           key: ${{ secrets.OCI_SSH_KEY }}
-          source: "build/libs/*.jar"
+          source: "build/libs/app.jar.new"
           target: "/home/ubuntu/paseape"
           strip_components: 2
 
@@ -43,17 +60,24 @@ jobs:
           username: ${{ secrets.OCI_USERNAME }}
           key: ${{ secrets.OCI_SSH_KEY }}
           script: |
+            set -e
             cd /home/ubuntu/paseape
-            # Renombrar el artefacto recibido al nombre estandar montado por compose
-            mv -f *.jar app.jar
 
-            # Recrear el contenedor con cero tiempo muerto de red
+            # Reemplazo atomico del archivo viejo por el nuevo
+            if [ -f app.jar.new ]; then
+              mv -f app.jar.new app.jar
+              echo "app.jar actualizado exitosamente con la nueva version."
+            else
+              echo "Error: No se recibio app.jar.new en el servidor."
+              exit 1
+            fi
+
+            # Recrear el contenedor montando el nuevo binario
             docker compose up -d --force-recreate --remove-orphans
 
       - name: Smoke Test (Healthcheck en Vivo con reintentos nativos)
         run: |
           echo "Ejecutando verificacion de disponibilidad en produccion..."
-          # Reintenta cada 3 segundos hasta por 60 segundos buscando HTTP 200
           curl --fail \
                --retry 20 \
                --retry-delay 3 \
