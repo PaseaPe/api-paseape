@@ -81,21 +81,17 @@ jobs:
             chmod 644 app.jar
             ls -lh app.jar
 
-            echo "=== 5. Normalizando variables de zona horaria en .env remoto ==="
+            echo "=== 5. Sincronizando variables en .env remoto ==="
             if [ -f .env ]; then
               sed -i 's/^TZ=.*/TZ=UTC/' .env
-              # Eliminar comillas dobles residuales de JAVA_TOOL_OPTIONS para evitar fallos de interpretacion en Docker
               sed -i 's/^JAVA_TOOL_OPTIONS=.*/JAVA_TOOL_OPTIONS=-Duser.timezone=UTC/' .env
               grep -q "^TZ=" .env || echo "TZ=UTC" >> .env
-              grep -q "^JAVA_TOOL_OPTIONS=" .env || echo "JAVA_TOOL_OPTIONS=-Duser.timezone=UTC" >> .env
             else
               echo "TZ=UTC" > .env
               echo "JAVA_TOOL_OPTIONS=-Duser.timezone=UTC" >> .env
             fi
 
-            echo "=== 6. Levantando servicio inyectando UTC al entorno de Docker ==="
-            TZ=UTC \
-            JAVA_TOOL_OPTIONS=-Duser.timezone=UTC \
+            echo "=== 6. Levantando servicio con Docker Compose ==="
             docker compose up -d --force-recreate --remove-orphans
 
             echo "=== 7. Registro de arranque del contenedor ==="
