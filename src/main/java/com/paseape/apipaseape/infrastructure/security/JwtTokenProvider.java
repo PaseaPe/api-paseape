@@ -1,9 +1,15 @@
 package com.paseape.apipaseape.infrastructure.security;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.UnsupportedJwtException;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SecurityException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -14,12 +20,14 @@ import java.util.Date;
 @Component
 public class JwtTokenProvider {
 
+    private static final Logger log = LoggerFactory.getLogger(JwtTokenProvider.class);
+
     private final SecretKey key;
     private final long expirationMs;
 
     public JwtTokenProvider(
             @Value("${app.security.jwt-secret}") String secret,
-            @Value("${app.security.jwt-expiration-ms}") long expirationMs) {
+            @Value("${app.security.jwt-expiration-ms:86400000}") long expirationMs) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirationMs = expirationMs;
     }
@@ -30,8 +38,8 @@ public class JwtTokenProvider {
 
         return Jwts.builder()
                 .subject(String.valueOf(userId))
-                .claim("email", email)
-                .claim("role", role)
+                .claim("email", email != null ? email.trim().toLowerCase() : "")
+                .claim("role", role != null ? role.toUpperCase() : "OWNER")
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(key)
@@ -42,12 +50,39 @@ public class JwtTokenProvider {
         try {
             Jwts.parser().verifyWith(key).build().parseSignedClaims(token);
             return true;
-        } catch (JwtException | IllegalArgumentException e) {
-            return false;
+        } catch (SecurityException | MalformedJwtException e) {
+            log.warn("[JWT-AUTH] Firma criptográfica inválida o token corrupto: {}", e.getMessage());
+        } catch (ExpiredJwtException e) {
+            log.warn("[JWT-AUTH] Token expirado: {}", e.getMessage());
+        } catch (UnsupportedJwtException e) {
+            log.warn("[JWT-AUTH] Formato de token no soportado: {}", e.getMessage());
+        } catch (IllegalArgumentException e) {
+            log.warn("[JWT-AUTH] Cadena de claims vacía o nula: {}", e.getMessage());
+        } catch (JwtException e) {
+            log.warn("[JWT-AUTH] Error general de procesamiento JWT: {}", e.getMessage());
         }
+        return false;
     }
 
     public Claims getClaims(String token) {
-        return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+        return Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+    }
+
+    public String getEmailFromToken(String token) {
+        Claims claims = getClaims(token);
+        String email = claims.get("email", String.class);
+        return email != null ? email : claims.getSubject();
+    }
+
+    public String getRoleFromToken(String token) {
+        return getClaims(token).get("role", String.class);
+    }
+
+    public Long getUserIdFromToken(String token) {
+        return Long.parseLong(getClaims(token).getSubject());
     }
 }
