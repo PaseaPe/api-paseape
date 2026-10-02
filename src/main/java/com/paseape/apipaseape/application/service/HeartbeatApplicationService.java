@@ -13,11 +13,10 @@ import java.time.LocalDateTime;
 public class HeartbeatApplicationService {
 
     private final ISistemaHeartbeatRepository heartbeatRepository;
-    private SistemaHeartbeat byComponente;
 
     @Transactional
     public void procesarLatido(String componente, String ipOrigen) {
-        SistemaHeartbeat heartbeat = byComponente;
+        SistemaHeartbeat heartbeat = heartbeatRepository.findByComponente(componente);
 
         if (heartbeat != null) {
             // Modificación orquestada en la capa de aplicación/dominio
