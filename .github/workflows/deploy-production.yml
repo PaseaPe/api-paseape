@@ -72,8 +72,8 @@ jobs:
               exit 1
             fi
 
-            # Recrear el contenedor montando el nuevo binario
-            docker compose up -d --force-recreate --remove-orphans
+            # Inyectar TZ y JAVA_TOOL_OPTIONS (-Duser.timezone=UTC) al reiniciar el contenedor
+            TZ=UTC JAVA_TOOL_OPTIONS="-Duser.timezone=UTC" docker compose up -d --force-recreate --remove-orphans
 
       - name: Smoke Test (Healthcheck en Vivo con reintentos nativos)
         run: |
