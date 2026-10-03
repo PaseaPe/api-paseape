@@ -1,0 +1,66 @@
+package com.paseape.apipaseape.infrastructure.repository;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.paseape.apipaseape.application.repository.ITipoDocumentoRepository;
+import com.paseape.apipaseape.domain.entity.TipoDocumento;
+import com.paseape.apipaseape.infrastructure.entity.TipoDocumentoEntity;
+import com.paseape.apipaseape.infrastructure.mapper.ITipoDocumentoDboMapper;
+import com.paseape.apipaseape.infrastructure.repository.jpa.ITipoDocumentoJpaRepository;
+
+import java.util.List;
+
+@Repository
+@RequiredArgsConstructor
+public class TipoDocumentoRepository implements ITipoDocumentoRepository {
+
+    private final ITipoDocumentoJpaRepository jpaRepository;
+    private final ITipoDocumentoDboMapper mapper;
+
+    @Override
+    @Transactional(readOnly = true)
+    public TipoDocumento findById(Integer id) {
+        if (id == null) {
+            return null;
+        }
+        TipoDocumentoEntity entity = jpaRepository.findById(id.intValue());
+        return entity != null ? mapper.toDomain(entity) : null;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TipoDocumento findByUuid(String uuid) {
+        if (uuid == null || uuid.trim().isEmpty()) {
+            return null;
+        }
+        TipoDocumentoEntity entity = jpaRepository.findByUuid(uuid.trim());
+        return entity != null ? mapper.toDomain(entity) : null;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TipoDocumento findByDescripcion(String descripcion) {
+        if (descripcion == null || descripcion.trim().isEmpty()) {
+            return null;
+        }
+        TipoDocumentoEntity entity = jpaRepository.findByDescripcion(descripcion.trim());
+        return entity != null ? mapper.toDomain(entity) : null;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TipoDocumento> findAllByEstado(Integer estado) {
+        List<TipoDocumentoEntity> entities = jpaRepository.findByEstado(estado);
+        return mapper.toDomainList(entities);
+    }
+
+    @Override
+    @Transactional
+    public TipoDocumento save(TipoDocumento tipoDocumento) {
+        TipoDocumentoEntity entity = mapper.toEntity(tipoDocumento);
+        TipoDocumentoEntity savedEntity = jpaRepository.save(entity);
+        return mapper.toDomain(savedEntity);
+    }
+}
