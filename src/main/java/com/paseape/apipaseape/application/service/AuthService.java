@@ -1,50 +1,39 @@
 package com.paseape.apipaseape.application.service;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import com.paseape.apipaseape.application.repository.IClienteRepository;
-import com.paseape.apipaseape.application.repository.IDistritoLimaRepository;
-import com.paseape.apipaseape.application.repository.IMascotaRepository;
-import com.paseape.apipaseape.application.repository.IPaseadorEstadoVerificacionRepository;
-import com.paseape.apipaseape.application.repository.IPaseadorRepository;
-import com.paseape.apipaseape.application.repository.ITipoDocumentoRepository;
-import com.paseape.apipaseape.application.repository.ITipoGeneroMascotaRepository;
-import com.paseape.apipaseape.application.repository.ITipoMascotaRepository;
-import com.paseape.apipaseape.application.repository.ITipoNivelEnergiaRepository;
-import com.paseape.apipaseape.application.repository.ITipoProveedorAuthRepository;
-import com.paseape.apipaseape.application.repository.ITipoRazaRepository;
-import com.paseape.apipaseape.application.repository.ITipoTamanoMascotaRepository;
-import com.paseape.apipaseape.application.repository.ITipoUsuarioRepository;
-import com.paseape.apipaseape.application.repository.IUsuarioEstadoRepository;
-import com.paseape.apipaseape.application.repository.IUsuarioRepository;
-import com.paseape.apipaseape.domain.entity.Cliente;
-import com.paseape.apipaseape.domain.entity.DistritoLima;
-import com.paseape.apipaseape.domain.entity.Mascota;
-import com.paseape.apipaseape.domain.entity.Paseador;
-import com.paseape.apipaseape.domain.entity.PaseadorEstadoVerificacion;
-import com.paseape.apipaseape.domain.entity.TipoDocumento;
-import com.paseape.apipaseape.domain.entity.TipoGeneroMascota;
-import com.paseape.apipaseape.domain.entity.TipoMascota;
-import com.paseape.apipaseape.domain.entity.TipoNivelEnergia;
-import com.paseape.apipaseape.domain.entity.TipoProveedorAuth;
-import com.paseape.apipaseape.domain.entity.TipoRaza;
-import com.paseape.apipaseape.domain.entity.TipoTamanoMascota;
-import com.paseape.apipaseape.domain.entity.TipoUsuario;
-import com.paseape.apipaseape.domain.entity.Usuario;
-import com.paseape.apipaseape.domain.entity.UsuarioEstado;
 import com.paseape.apipaseape.infrastructure.dto.request.*;
-import com.paseape.apipaseape.infrastructure.dto.response.AuthResDto;
 import com.paseape.apipaseape.infrastructure.dto.response.ForgotPasswordResDto;
 import com.paseape.apipaseape.infrastructure.dto.response.LogoutResDto;
-import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
 import com.paseape.apipaseape.infrastructure.repository.http.BrevoEmailHttpRepository;
-import com.paseape.apipaseape.infrastructure.repository.http.GoogleTokenVerifierHttpRepository;
-import com.paseape.apipaseape.infrastructure.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+
+import com.paseape.apipaseape.application.repository.IClienteRepository;
+import com.paseape.apipaseape.application.repository.IDistritoLimaRepository;
+import com.paseape.apipaseape.application.repository.IPaseadorEstadoVerificacionRepository;
+import com.paseape.apipaseape.application.repository.IPaseadorRepository;
+import com.paseape.apipaseape.application.repository.ITipoDocumentoRepository;
+import com.paseape.apipaseape.application.repository.ITipoProveedorAuthRepository;
+import com.paseape.apipaseape.application.repository.ITipoUsuarioRepository;
+import com.paseape.apipaseape.application.repository.IUsuarioEstadoRepository;
+import com.paseape.apipaseape.application.repository.IUsuarioRepository;
+import com.paseape.apipaseape.domain.entity.Cliente;
+import com.paseape.apipaseape.domain.entity.DistritoLima;
+import com.paseape.apipaseape.domain.entity.Paseador;
+import com.paseape.apipaseape.domain.entity.PaseadorEstadoVerificacion;
+import com.paseape.apipaseape.domain.entity.TipoDocumento;
+import com.paseape.apipaseape.domain.entity.TipoProveedorAuth;
+import com.paseape.apipaseape.domain.entity.TipoUsuario;
+import com.paseape.apipaseape.domain.entity.Usuario;
+import com.paseape.apipaseape.domain.entity.UsuarioEstado;
+import com.paseape.apipaseape.infrastructure.dto.response.AuthResDto;
+import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
+import com.paseape.apipaseape.infrastructure.repository.http.GoogleTokenVerifierHttpRepository;
+import com.paseape.apipaseape.infrastructure.security.JwtTokenProvider;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -58,11 +47,11 @@ public class AuthService {
     private final GoogleTokenVerifierHttpRepository googleTokenVerifier;
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
+    private final MascotaService mascotaService;
 
     private final IUsuarioRepository usuarioRepository;
     private final IClienteRepository clienteRepository;
     private final IPaseadorRepository paseadorRepository;
-    private final IMascotaRepository mascotaRepository;
 
     private final ITipoUsuarioRepository tipoUsuarioRepository;
     private final IUsuarioEstadoRepository usuarioEstadoRepository;
@@ -70,56 +59,29 @@ public class AuthService {
     private final IDistritoLimaRepository distritoLimaRepository;
     private final ITipoDocumentoRepository tipoDocumentoRepository;
     private final IPaseadorEstadoVerificacionRepository paseadorEstadoVerificacionRepository;
-    private final ITipoMascotaRepository tipoMascotaRepository;
-    private final ITipoRazaRepository tipoRazaRepository;
-    private final ITipoGeneroMascotaRepository tipoGeneroMascotaRepository;
-    private final ITipoTamanoMascotaRepository tipoTamanoMascotaRepository;
-    private final ITipoNivelEnergiaRepository tipoNivelEnergiaRepository;
     private final BrevoEmailHttpRepository brevoEmailHttpRepository;
 
     @Transactional(readOnly = true)
     public AuthResDto authenticateWithGoogle(GoogleAuthReqDto reqDto) throws BadRequestException {
-        if (reqDto == null || !StringUtils.hasText(reqDto.getIdToken())) {
-            throw new BadRequestException("El token de Google (id_token) es estrictamente obligatorio.");
-        }
-
         GoogleIdToken.Payload payload = googleTokenVerifier.verify(reqDto.getIdToken());
-        String email = payload.getEmail() != null ? payload.getEmail().trim().toLowerCase() : null;
-        String googleSub = payload.getSubject();
-
-        if (!StringUtils.hasText(email)) {
-            throw new BadRequestException("No se pudo obtener el correo electronico del token de Google.");
-        }
+        String email = payload.getEmail().trim().toLowerCase();
+        String sub = payload.getSubject();
 
         Usuario usuario = usuarioRepository.findByCorreo(email);
-        if (usuario == null && StringUtils.hasText(googleSub)) {
-            usuario = usuarioRepository.findByProviderId(googleSub);
-        }
-
         if (usuario == null) {
-            throw new BadRequestException("El usuario con correo " + email + " no se encuentra registrado. Complete su registro antes de iniciar sesion.");
+            usuario = usuarioRepository.findByProviderId(sub);
         }
-
-        if (usuario.getUsuarioEstado() != null &&
-                usuario.getUsuarioEstado().getId() != null &&
-                usuario.getUsuarioEstado().getId() == ID_BLOQUEADO) {
-            throw new BadRequestException("La cuenta de usuario se encuentra bloqueada.");
-        }
-
-        if (usuario.getEstado() != null && usuario.getEstado() == 0) {
-            throw new BadRequestException("La cuenta de usuario se encuentra inactiva.");
+        if (usuario == null) {
+            throw new BadRequestException("El usuario con correo " + email + " no se encuentra registrado.");
         }
 
         String role = resolveRoleName(usuario.getTipoUsuario() != null ? usuario.getTipoUsuario().getId() : null);
         String token = jwtTokenProvider.generateToken(usuario.getId(), usuario.getCorreo(), role);
 
-        String fullName = (StringUtils.hasText(usuario.getNombres()) ? usuario.getNombres() : "") +
-                (StringUtils.hasText(usuario.getApellidos()) ? " " + usuario.getApellidos() : "");
-
         return AuthResDto.builder()
                 .id(usuario.getId())
                 .email(usuario.getCorreo())
-                .fullName(fullName.trim())
+                .fullName(usuario.getNombres() + " " + usuario.getApellidos())
                 .pictureUrl(usuario.getFotoPerfilUrl())
                 .role(role)
                 .token(token)
@@ -132,34 +94,23 @@ public class AuthService {
         Usuario usuario = usuarioRepository.findByCorreo(normalizedEmail);
 
         if (usuario == null) {
-            throw new BadRequestException("Credenciales de acceso invalidas.");
+            throw new BadRequestException("Credenciales de acceso inválidas.");
         }
 
         if (!StringUtils.hasText(usuario.getContrasenaHash()) ||
                 !passwordEncoder.matches(reqDto.getContrasena(), usuario.getContrasenaHash())) {
-            throw new BadRequestException("Credenciales de acceso invalidas.");
+            throw new BadRequestException("Credenciales de acceso inválidas.");
         }
 
-        if (usuario.getUsuarioEstado() != null &&
-                usuario.getUsuarioEstado().getId() != null &&
-                usuario.getUsuarioEstado().getId() == ID_BLOQUEADO) {
-            throw new BadRequestException("La cuenta de usuario se encuentra bloqueada.");
-        }
-
-        if (usuario.getEstado() != null && usuario.getEstado() == 0) {
-            throw new BadRequestException("La cuenta de usuario se encuentra inactiva.");
-        }
+        resolveUsuarioEstado(usuario.getUsuarioEstado().getId());
 
         String role = resolveRoleName(usuario.getTipoUsuario() != null ? usuario.getTipoUsuario().getId() : null);
         String token = jwtTokenProvider.generateToken(usuario.getId(), usuario.getCorreo(), role);
 
-        String fullName = (StringUtils.hasText(usuario.getNombres()) ? usuario.getNombres() : "") +
-                (StringUtils.hasText(usuario.getApellidos()) ? " " + usuario.getApellidos() : "");
-
         return AuthResDto.builder()
                 .id(usuario.getId())
                 .email(usuario.getCorreo())
-                .fullName(fullName.trim())
+                .fullName(construirNombreCompleto(usuario.getNombres(), usuario.getApellidos()))
                 .pictureUrl(usuario.getFotoPerfilUrl())
                 .role(role)
                 .token(token)
@@ -192,17 +143,13 @@ public class AuthService {
             throw new BadRequestException("Ya existe una cuenta registrada con el correo: " + email);
         }
         if (usuarioRepository.findByProviderId(googleSub) != null) {
-            throw new BadRequestException("La cuenta de Google ya esta vinculada a otro perfil de usuario.");
+            throw new BadRequestException("La cuenta de Google ya está vinculada a otro perfil de usuario.");
         }
 
         String nombres = StringUtils.hasText(reqDto.getNombres()) ? reqDto.getNombres().trim() : (String) payload.get("given_name");
         String apellidos = StringUtils.hasText(reqDto.getApellidos()) ? reqDto.getApellidos().trim() : (String) payload.get("family_name");
-        if (!StringUtils.hasText(nombres)) {
-            nombres = (String) payload.get("name");
-        }
-        if (!StringUtils.hasText(apellidos)) {
-            apellidos = "";
-        }
+        if (!StringUtils.hasText(nombres)) nombres = (String) payload.get("name");
+        if (!StringUtils.hasText(apellidos)) apellidos = "";
 
         String fotoUrl = StringUtils.hasText(reqDto.getFotoPerfilUrl()) ? reqDto.getFotoPerfilUrl() : (String) payload.get("picture");
 
@@ -219,7 +166,7 @@ public class AuthService {
                 .usuarioEstado(resolveUsuarioEstado(ID_ACTIVO))
                 .tipoProveedorAuth(resolveTipoProveedorAuth(ID_GOOGLE))
                 .providerId(googleSub)
-                .estado(1)
+                .estado(ESTADO_LOGICO_ACTIVO)
                 .build();
 
         Usuario savedUser = usuarioRepository.save(nuevoUsuario);
@@ -259,7 +206,7 @@ public class AuthService {
                 .usuarioEstado(resolveUsuarioEstado(ID_ACTIVO))
                 .tipoProveedorAuth(resolveTipoProveedorAuth(ID_LOCAL))
                 .providerId(null)
-                .estado(1)
+                .estado(ESTADO_LOGICO_ACTIVO)
                 .build();
 
         Usuario savedUser = usuarioRepository.save(nuevoUsuario);
@@ -297,20 +244,21 @@ public class AuthService {
                     .contactoEmergenciaNombre(reqDto.getContactoEmergenciaNombre())
                     .contactoEmergenciaTelefono(reqDto.getContactoEmergenciaTelefono())
                     .notasAdicionales(reqDto.getNotasAdicionales())
-                    .estado(1)
+                    .estado(ESTADO_LOGICO_ACTIVO)
                     .build();
 
             Cliente savedCliente = clienteRepository.save(nuevoCliente);
 
-            if (reqDto.getMascota() != null && StringUtils.hasText(reqDto.getMascota().getNombre())) {
-                registrarMascota(savedCliente, reqDto.getMascota());
+            // Inserción en lote si se enviaron mascotas
+            if (reqDto.getMascotas() != null && !reqDto.getMascotas().isEmpty()) {
+                mascotaService.registrarMascotas(savedCliente, reqDto.getMascotas());
             }
 
         } else if (usuario.getTipoUsuario().getId() == ID_PASEADOR) {
             if (StringUtils.hasText(reqDto.getNumeroDocumento())) {
-                Paseador existingPaseador = paseadorRepository.findByNumeroDocumento(reqDto.getNumeroDocumento().trim());
-                if (existingPaseador != null) {
-                    throw new BadRequestException("El numero de documento " + reqDto.getNumeroDocumento() + " ya esta registrado.");
+                Paseador existing = paseadorRepository.findByNumeroDocumento(reqDto.getNumeroDocumento().trim());
+                if (existing != null) {
+                    throw new BadRequestException("El número de documento " + reqDto.getNumeroDocumento() + " ya está en uso.");
                 }
             }
 
@@ -346,60 +294,11 @@ public class AuthService {
                     .estadoVerificacion(estadoVerificacion)
                     .paseosCompletados(0)
                     .calificacionPromedio(BigDecimal.ZERO)
-                    .estado(1)
+                    .estado(ESTADO_LOGICO_ACTIVO)
                     .build();
 
             paseadorRepository.save(nuevoPaseador);
         }
-    }
-
-    private void registrarMascota(Cliente cliente, MascotaReqDto dto) throws BadRequestException {
-        TipoMascota tipoMascota = tipoMascotaRepository.findById(dto.getTipoMascotaId());
-        if (tipoMascota == null) {
-            throw new BadRequestException("El tipo de mascota con ID " + dto.getTipoMascotaId() + " no existe.");
-        }
-
-        TipoRaza tipoRaza = tipoRazaRepository.findById(dto.getTipoRazaId());
-        if (tipoRaza == null) {
-            throw new BadRequestException("La raza con ID " + dto.getTipoRazaId() + " no existe.");
-        }
-
-        TipoGeneroMascota tipoGenero = tipoGeneroMascotaRepository.findById(dto.getTipoGeneroMascotaId());
-        if (tipoGenero == null) {
-            throw new BadRequestException("El genero con ID " + dto.getTipoGeneroMascotaId() + " no existe.");
-        }
-
-        TipoTamanoMascota tipoTamano = tipoTamanoMascotaRepository.findById(dto.getTipoTamanoMascotaId());
-        if (tipoTamano == null) {
-            throw new BadRequestException("El tamano con ID " + dto.getTipoTamanoMascotaId() + " no existe.");
-        }
-
-        TipoNivelEnergia tipoEnergia = tipoNivelEnergiaRepository.findById(dto.getTipoNivelEnergiaId());
-        if (tipoEnergia == null) {
-            throw new BadRequestException("El nivel de energia con ID " + dto.getTipoNivelEnergiaId() + " no existe.");
-        }
-
-        Mascota mascota = Mascota.builder()
-                .uuid(UUID.randomUUID().toString())
-                .cliente(cliente)
-                .nombre(dto.getNombre().trim())
-                .tipoMascota(tipoMascota)
-                .tipoRaza(tipoRaza)
-                .tipoGeneroMascota(tipoGenero)
-                .tipoTamanoMascota(tipoTamano)
-                .tipoNivelEnergia(tipoEnergia)
-                .edadAnos(dto.getEdadAnos() != null ? dto.getEdadAnos() : 0)
-                .edadMeses(dto.getEdadMeses() != null ? dto.getEdadMeses() : 0)
-                .pesoKg(dto.getPesoKg())
-                .esterilizado(dto.getEsterilizado() != null ? dto.getEsterilizado() : 0)
-                .sociableConPerros(dto.getSociableConPerros() != null ? dto.getSociableConPerros() : 1)
-                .sociableConPersonas(dto.getSociableConPersonas() != null ? dto.getSociableConPersonas() : 1)
-                .precaucionesMedicas(dto.getPrecaucionesMedicas())
-                .fotoUrl(dto.getFotoUrl())
-                .estado(1)
-                .build();
-
-        mascotaRepository.save(mascota);
     }
 
     @Transactional
@@ -476,37 +375,32 @@ public class AuthService {
 
     private TipoUsuario resolveTipoUsuario(Integer id) throws BadRequestException {
         TipoUsuario entity = tipoUsuarioRepository.findById(id);
-        if (entity == null) {
-            throw new BadRequestException("El tipo de usuario indicado no existe.");
-        }
+        if (entity == null) throw new BadRequestException("El tipo de usuario indicado no existe.");
         return entity;
     }
 
     private UsuarioEstado resolveUsuarioEstado(Integer id) throws BadRequestException {
         UsuarioEstado entity = usuarioEstadoRepository.findById(id);
-        if (entity == null) {
-            throw new BadRequestException("El estado de usuario indicado no existe.");
-        }
+        if (entity == null) throw new BadRequestException("El estado de usuario indicado no existe.");
         return entity;
     }
 
     private TipoProveedorAuth resolveTipoProveedorAuth(Integer id) throws BadRequestException {
         TipoProveedorAuth entity = tipoProveedorAuthRepository.findById(id);
-        if (entity == null) {
-            throw new BadRequestException("El proveedor de autenticacion no existe.");
-        }
+        if (entity == null) throw new BadRequestException("El proveedor de autenticación no existe.");
         return entity;
     }
 
     private String resolveRoleName(Integer tipoUsuarioId) {
-        if (tipoUsuarioId != null) {
-            if (tipoUsuarioId == ID_PASEADOR) {
-                return ROL_PASEADOR;
-            }
-            if (tipoUsuarioId == ID_ADMINISTRADOR) {
-                return ROL_ADMINISTRADOR;
-            }
+        if (tipoUsuarioId != null && tipoUsuarioId == ID_PASEADOR) {
+            return ROL_PASEADOR;
         }
         return ROL_CLIENTE;
+    }
+
+    private String construirNombreCompleto(String nombres, String apellidos) {
+        String n = StringUtils.hasText(nombres) ? nombres.trim() : "";
+        String a = StringUtils.hasText(apellidos) ? apellidos.trim() : "";
+        return (n + " " + a).trim();
     }
 }
