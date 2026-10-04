@@ -17,6 +17,8 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
+import static com.paseape.apipaseape.infrastructure.constant.Constant.*;
+
 @Component
 public class JwtTokenProvider {
 
@@ -44,6 +46,30 @@ public class JwtTokenProvider {
                 .expiration(expiryDate)
                 .signWith(key)
                 .compact();
+    }
+
+    public String generatePasswordResetToken(Long userId, String email) {
+        Date now = new Date();
+        Date expiryDate = new Date(now.getTime() + EXPIRATION_RESET_TOKEN_MS);
+        return Jwts.builder()
+                .subject(String.valueOf(userId))
+                .claim("email", email != null ? email.trim().toLowerCase() : "")
+                .claim(PURPOSE_CLAIM, PURPOSE_PASSWORD_RESET)
+                .issuedAt(now)
+                .expiration(expiryDate)
+                .signWith(key)
+                .compact();
+    }
+
+    public boolean validatePasswordResetToken(String token) {
+        try {
+            Claims claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+            String purpose = claims.get(PURPOSE_CLAIM, String.class);
+            return PURPOSE_PASSWORD_RESET.equals(purpose);
+        } catch (JwtException | IllegalArgumentException e) {
+            log.warn("[JWT-RESET] Token de restablecimiento invalido: {}", e.getMessage());
+            return false;
+        }
     }
 
     public boolean validateToken(String token) {

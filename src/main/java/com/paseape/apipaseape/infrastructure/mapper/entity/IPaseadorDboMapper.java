@@ -1,4 +1,4 @@
-package com.paseape.apipaseape.infrastructure.mapper;
+package com.paseape.apipaseape.infrastructure.mapper.entity;
 
 import com.paseape.apipaseape.domain.entity.Paseador;
 import com.paseape.apipaseape.infrastructure.entity.PaseadorEntity;

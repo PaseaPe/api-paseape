@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.paseape.apipaseape.application.repository.IMascotaRepository;
 import com.paseape.apipaseape.domain.entity.Mascota;
 import com.paseape.apipaseape.infrastructure.entity.MascotaEntity;
-import com.paseape.apipaseape.infrastructure.mapper.IMascotaDboMapper;
+import com.paseape.apipaseape.infrastructure.mapper.entity.IMascotaDboMapper;
 import com.paseape.apipaseape.infrastructure.repository.jpa.IMascotaJpaRepository;
 
 import java.util.List;

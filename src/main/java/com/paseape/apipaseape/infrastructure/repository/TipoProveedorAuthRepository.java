@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.paseape.apipaseape.application.repository.ITipoProveedorAuthRepository;
 import com.paseape.apipaseape.domain.entity.TipoProveedorAuth;
 import com.paseape.apipaseape.infrastructure.entity.TipoProveedorAuthEntity;
-import com.paseape.apipaseape.infrastructure.mapper.ITipoProveedorAuthDboMapper;
+import com.paseape.apipaseape.infrastructure.mapper.entity.ITipoProveedorAuthDboMapper;
 import com.paseape.apipaseape.infrastructure.repository.jpa.ITipoProveedorAuthJpaRepository;
 
 import java.util.List;

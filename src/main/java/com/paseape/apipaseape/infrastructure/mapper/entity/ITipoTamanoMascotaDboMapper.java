@@ -1,4 +1,4 @@
-package com.paseape.apipaseape.infrastructure.mapper;
+package com.paseape.apipaseape.infrastructure.mapper.entity;
 
 import com.paseape.apipaseape.domain.entity.TipoTamanoMascota;
 import com.paseape.apipaseape.infrastructure.entity.TipoTamanoMascotaEntity;

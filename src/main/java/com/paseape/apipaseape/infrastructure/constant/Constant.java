@@ -152,4 +152,16 @@ public class Constant {
     public static final int ID_BRITISH_SHORTHAIR = 38;
     public static final int ID_AZUL_RUSO = 39;
     public static final int ID_OTRA_RAZA_FELINA = 40;
+
+    //BREVO
+    public static final String HEADER_API_KEY = "api-key";
+    public static final String NOTIF_RECUPERACION_CONTRASENA = "RECUPERACION_CONTRASENA";
+    public static final String ASUNTO_RECUPERACION_CONTRASENA = "PaseaPe - Recuperación de Contraseña";
+    public static final String PURPOSE_CLAIM = "purpose";
+    public static final String PURPOSE_PASSWORD_RESET = "PASSWORD_RESET";
+    public static final long EXPIRATION_RESET_TOKEN_MS = 900000L; // 15 minutos en milisegundos
+
+    //ESTADO LOGICO
+    public static final int ESTADO_LOGICO_ACTIVO = 1;
+    public static final int ESTADO_LOGICO_INACTIVO = 0;
 }

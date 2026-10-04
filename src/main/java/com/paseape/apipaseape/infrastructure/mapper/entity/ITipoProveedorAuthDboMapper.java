@@ -1,4 +1,4 @@
-package com.paseape.apipaseape.infrastructure.mapper;
+package com.paseape.apipaseape.infrastructure.mapper.entity;
 
 import org.mapstruct.Mapper;
 import org.mapstruct.MappingConstants;

@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.paseape.apipaseape.application.repository.ITipoNivelEnergiaRepository;
 import com.paseape.apipaseape.domain.entity.TipoNivelEnergia;
 import com.paseape.apipaseape.infrastructure.entity.TipoNivelEnergiaEntity;
-import com.paseape.apipaseape.infrastructure.mapper.ITipoNivelEnergiaDboMapper;
+import com.paseape.apipaseape.infrastructure.mapper.entity.ITipoNivelEnergiaDboMapper;
 import com.paseape.apipaseape.infrastructure.repository.jpa.ITipoNivelEnergiaJpaRepository;
 
 import java.util.List;

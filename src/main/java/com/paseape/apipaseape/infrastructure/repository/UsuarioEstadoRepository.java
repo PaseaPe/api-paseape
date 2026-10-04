@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.paseape.apipaseape.application.repository.IUsuarioEstadoRepository;
 import com.paseape.apipaseape.domain.entity.UsuarioEstado;
 import com.paseape.apipaseape.infrastructure.entity.UsuarioEstadoEntity;
-import com.paseape.apipaseape.infrastructure.mapper.IUsuarioEstadoDboMapper;
+import com.paseape.apipaseape.infrastructure.mapper.entity.IUsuarioEstadoDboMapper;
 import com.paseape.apipaseape.infrastructure.repository.jpa.IUsuarioEstadoJpaRepository;
 
 import java.util.List;

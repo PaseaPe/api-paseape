@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.paseape.apipaseape.application.repository.IPaseadorEstadoVerificacionRepository;
 import com.paseape.apipaseape.domain.entity.PaseadorEstadoVerificacion;
 import com.paseape.apipaseape.infrastructure.entity.PaseadorEstadoVerificacionEntity;
-import com.paseape.apipaseape.infrastructure.mapper.IPaseadorEstadoVerificacionDboMapper;
+import com.paseape.apipaseape.infrastructure.mapper.entity.IPaseadorEstadoVerificacionDboMapper;
 import com.paseape.apipaseape.infrastructure.repository.jpa.IPaseadorEstadoVerificacionJpaRepository;
 
 import java.util.List;

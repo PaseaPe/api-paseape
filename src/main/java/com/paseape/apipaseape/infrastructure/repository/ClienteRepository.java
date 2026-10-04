@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.paseape.apipaseape.application.repository.IClienteRepository;
 import com.paseape.apipaseape.domain.entity.Cliente;
 import com.paseape.apipaseape.infrastructure.entity.ClienteEntity;
-import com.paseape.apipaseape.infrastructure.mapper.IClienteDboMapper;
+import com.paseape.apipaseape.infrastructure.mapper.entity.IClienteDboMapper;
 import com.paseape.apipaseape.infrastructure.repository.jpa.IClienteJpaRepository;
 
 import java.util.List;

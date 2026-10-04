@@ -1,5 +1,8 @@
 package com.paseape.apipaseape.infrastructure.dto.request;
 
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -14,6 +17,8 @@ import tools.jackson.databind.annotation.JsonNaming;
 @AllArgsConstructor
 @Builder
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class GoogleAuthReqDto {
-    private String idToken;
+public class LoginReqDto {
+
+    private String correo;
+    private String contrasena;
 }

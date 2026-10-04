@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.paseape.apipaseape.application.repository.IAdministradorRepository;
 import com.paseape.apipaseape.domain.entity.Administrador;
 import com.paseape.apipaseape.infrastructure.entity.AdministradorEntity;
-import com.paseape.apipaseape.infrastructure.mapper.IAdministradorDboMapper;
+import com.paseape.apipaseape.infrastructure.mapper.entity.IAdministradorDboMapper;
 import com.paseape.apipaseape.infrastructure.repository.jpa.IAdministradorJpaRepository;
 
 import java.util.List;

@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.paseape.apipaseape.application.repository.IDistritoLimaRepository;
 import com.paseape.apipaseape.domain.entity.DistritoLima;
 import com.paseape.apipaseape.infrastructure.entity.DistritoLimaEntity;
-import com.paseape.apipaseape.infrastructure.mapper.IDistritoLimaDboMapper;
+import com.paseape.apipaseape.infrastructure.mapper.entity.IDistritoLimaDboMapper;
 import com.paseape.apipaseape.infrastructure.repository.jpa.IDistritoLimaJpaRepository;
 
 import java.util.List;

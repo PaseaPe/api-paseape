@@ -1,4 +1,4 @@
-package com.paseape.apipaseape.infrastructure.dto.request;
+package com.paseape.apipaseape.infrastructure.dto.response.parameter;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,6 +14,10 @@ import tools.jackson.databind.annotation.JsonNaming;
 @AllArgsConstructor
 @Builder
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class GoogleAuthReqDto {
-    private String idToken;
+public class TipoTamanoMascotaItemResDto {
+
+    private Integer id;
+    private String uuid;
+    private String descripcion;
+    private String rangoPesoRef;
 }

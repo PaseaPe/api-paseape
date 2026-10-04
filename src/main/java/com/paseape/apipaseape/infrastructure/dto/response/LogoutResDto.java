@@ -1,4 +1,4 @@
-package com.paseape.apipaseape.infrastructure.dto.request;
+package com.paseape.apipaseape.infrastructure.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,6 +14,9 @@ import tools.jackson.databind.annotation.JsonNaming;
 @AllArgsConstructor
 @Builder
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-public class GoogleAuthReqDto {
-    private String idToken;
+public class LogoutResDto {
+
+    private String correo;
+    private String mensaje;
+    private Boolean requiereRevocacionGoogle;
 }

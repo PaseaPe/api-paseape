@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.paseape.apipaseape.application.repository.ITipoGeneroMascotaRepository;
 import com.paseape.apipaseape.domain.entity.TipoGeneroMascota;
 import com.paseape.apipaseape.infrastructure.entity.TipoGeneroMascotaEntity;
-import com.paseape.apipaseape.infrastructure.mapper.ITipoGeneroMascotaDboMapper;
+import com.paseape.apipaseape.infrastructure.mapper.entity.ITipoGeneroMascotaDboMapper;
 import com.paseape.apipaseape.infrastructure.repository.jpa.ITipoGeneroMascotaJpaRepository;
 
 import java.util.List;

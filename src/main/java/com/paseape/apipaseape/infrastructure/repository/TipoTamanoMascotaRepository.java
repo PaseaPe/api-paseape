@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.paseape.apipaseape.application.repository.ITipoTamanoMascotaRepository;
 import com.paseape.apipaseape.domain.entity.TipoTamanoMascota;
 import com.paseape.apipaseape.infrastructure.entity.TipoTamanoMascotaEntity;
-import com.paseape.apipaseape.infrastructure.mapper.ITipoTamanoMascotaDboMapper;
+import com.paseape.apipaseape.infrastructure.mapper.entity.ITipoTamanoMascotaDboMapper;
 import com.paseape.apipaseape.infrastructure.repository.jpa.ITipoTamanoMascotaJpaRepository;
 
 import java.util.List;

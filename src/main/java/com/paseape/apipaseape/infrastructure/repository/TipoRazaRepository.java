@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.paseape.apipaseape.application.repository.ITipoRazaRepository;
 import com.paseape.apipaseape.domain.entity.TipoRaza;
 import com.paseape.apipaseape.infrastructure.entity.TipoRazaEntity;
-import com.paseape.apipaseape.infrastructure.mapper.ITipoRazaDboMapper;
+import com.paseape.apipaseape.infrastructure.mapper.entity.ITipoRazaDboMapper;
 import com.paseape.apipaseape.infrastructure.repository.jpa.ITipoRazaJpaRepository;
 
 import java.util.List;

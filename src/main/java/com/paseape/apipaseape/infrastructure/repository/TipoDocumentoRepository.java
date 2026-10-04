@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.paseape.apipaseape.application.repository.ITipoDocumentoRepository;
 import com.paseape.apipaseape.domain.entity.TipoDocumento;
 import com.paseape.apipaseape.infrastructure.entity.TipoDocumentoEntity;
-import com.paseape.apipaseape.infrastructure.mapper.ITipoDocumentoDboMapper;
+import com.paseape.apipaseape.infrastructure.mapper.entity.ITipoDocumentoDboMapper;
 import com.paseape.apipaseape.infrastructure.repository.jpa.ITipoDocumentoJpaRepository;
 
 import java.util.List;
