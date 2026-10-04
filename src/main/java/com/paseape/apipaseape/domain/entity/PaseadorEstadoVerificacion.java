@@ -23,4 +23,8 @@ public class PaseadorEstadoVerificacion {
     private LocalDateTime actualizadoEl;
     private String creadoPor;
     private String actualizadoPor;
+
+    public PaseadorEstadoVerificacion(Integer id) {
+        this.id = id;
+    }
 }

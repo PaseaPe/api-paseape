@@ -24,4 +24,8 @@ public class TipoDocumento {
     private LocalDateTime actualizadoEl;
     private String creadoPor;
     private String actualizadoPor;
+
+    public TipoDocumento(Integer id) {
+        this.id = id;
+    }
 }

@@ -24,4 +24,8 @@ public class DistritoLima {
     private LocalDateTime actualizadoEl;
     private String creadoPor;
     private String actualizadoPor;
+
+    public DistritoLima(Integer id) {
+        this.id = id;
+    }
 }

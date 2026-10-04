@@ -23,4 +23,8 @@ public class UsuarioEstado {
     private LocalDateTime actualizadoEl;
     private String creadoPor;
     private String actualizadoPor;
+
+    public UsuarioEstado(Integer id) {
+        this.id = id;
+    }
 }

@@ -1,10 +1,7 @@
 package com.paseape.apipaseape.application.service;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import com.paseape.apipaseape.infrastructure.dto.request.*;
-import com.paseape.apipaseape.infrastructure.dto.response.ForgotPasswordResDto;
-import com.paseape.apipaseape.infrastructure.dto.response.LogoutResDto;
-import com.paseape.apipaseape.infrastructure.repository.http.BrevoEmailHttpRepository;
+import com.paseape.apipaseape.domain.entity.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -13,25 +10,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.paseape.apipaseape.application.repository.IClienteRepository;
-import com.paseape.apipaseape.application.repository.IDistritoLimaRepository;
-import com.paseape.apipaseape.application.repository.IPaseadorEstadoVerificacionRepository;
 import com.paseape.apipaseape.application.repository.IPaseadorRepository;
-import com.paseape.apipaseape.application.repository.ITipoDocumentoRepository;
-import com.paseape.apipaseape.application.repository.ITipoProveedorAuthRepository;
-import com.paseape.apipaseape.application.repository.ITipoUsuarioRepository;
-import com.paseape.apipaseape.application.repository.IUsuarioEstadoRepository;
 import com.paseape.apipaseape.application.repository.IUsuarioRepository;
-import com.paseape.apipaseape.domain.entity.Cliente;
-import com.paseape.apipaseape.domain.entity.DistritoLima;
-import com.paseape.apipaseape.domain.entity.Paseador;
-import com.paseape.apipaseape.domain.entity.PaseadorEstadoVerificacion;
-import com.paseape.apipaseape.domain.entity.TipoDocumento;
-import com.paseape.apipaseape.domain.entity.TipoProveedorAuth;
-import com.paseape.apipaseape.domain.entity.TipoUsuario;
-import com.paseape.apipaseape.domain.entity.Usuario;
-import com.paseape.apipaseape.domain.entity.UsuarioEstado;
+import com.paseape.apipaseape.infrastructure.dto.request.ForgotPasswordReqDto;
+import com.paseape.apipaseape.infrastructure.dto.request.GoogleAuthReqDto;
+import com.paseape.apipaseape.infrastructure.dto.request.LoginReqDto;
+import com.paseape.apipaseape.infrastructure.dto.request.ResetPasswordReqDto;
+import com.paseape.apipaseape.infrastructure.dto.request.UsuarioReqDto;
 import com.paseape.apipaseape.infrastructure.dto.response.AuthResDto;
+import com.paseape.apipaseape.infrastructure.dto.response.ForgotPasswordResDto;
+import com.paseape.apipaseape.infrastructure.dto.response.LogoutResDto;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
+import com.paseape.apipaseape.infrastructure.repository.http.BrevoEmailHttpRepository;
 import com.paseape.apipaseape.infrastructure.repository.http.GoogleTokenVerifierHttpRepository;
 import com.paseape.apipaseape.infrastructure.security.JwtTokenProvider;
 
@@ -48,18 +38,11 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
     private final MascotaService mascotaService;
+    private final BrevoEmailHttpRepository brevoEmailHttpRepository;
 
     private final IUsuarioRepository usuarioRepository;
     private final IClienteRepository clienteRepository;
     private final IPaseadorRepository paseadorRepository;
-
-    private final ITipoUsuarioRepository tipoUsuarioRepository;
-    private final IUsuarioEstadoRepository usuarioEstadoRepository;
-    private final ITipoProveedorAuthRepository tipoProveedorAuthRepository;
-    private final IDistritoLimaRepository distritoLimaRepository;
-    private final ITipoDocumentoRepository tipoDocumentoRepository;
-    private final IPaseadorEstadoVerificacionRepository paseadorEstadoVerificacionRepository;
-    private final BrevoEmailHttpRepository brevoEmailHttpRepository;
 
     @Transactional(readOnly = true)
     public AuthResDto authenticateWithGoogle(GoogleAuthReqDto reqDto) throws BadRequestException {
@@ -75,13 +58,15 @@ public class AuthService {
             throw new BadRequestException("El usuario con correo " + email + " no se encuentra registrado.");
         }
 
+        validarEstadoUsuario(usuario);
+
         String role = resolveRoleName(usuario.getTipoUsuario() != null ? usuario.getTipoUsuario().getId() : null);
         String token = jwtTokenProvider.generateToken(usuario.getId(), usuario.getCorreo(), role);
 
         return AuthResDto.builder()
                 .id(usuario.getId())
                 .email(usuario.getCorreo())
-                .fullName(usuario.getNombres() + " " + usuario.getApellidos())
+                .fullName(construirNombreCompleto(usuario.getNombres(), usuario.getApellidos()))
                 .pictureUrl(usuario.getFotoPerfilUrl())
                 .role(role)
                 .token(token)
@@ -102,7 +87,7 @@ public class AuthService {
             throw new BadRequestException("Credenciales de acceso inválidas.");
         }
 
-        resolveUsuarioEstado(usuario.getUsuarioEstado().getId());
+        validarEstadoUsuario(usuario);
 
         String role = resolveRoleName(usuario.getTipoUsuario() != null ? usuario.getTipoUsuario().getId() : null);
         String token = jwtTokenProvider.generateToken(usuario.getId(), usuario.getCorreo(), role);
@@ -117,19 +102,19 @@ public class AuthService {
                 .build();
     }
 
-    public LogoutResDto logout(String correoAutenticado) {
+    public LogoutResDto logout(String userIdentifier) {
         SecurityContextHolder.clearContext();
 
-        boolean esUsuarioGoogle = false;
-        Usuario usuario = usuarioRepository.findByCorreo(correoAutenticado);
+        boolean esGoogle = false;
+        Usuario usuario = usuarioRepository.findByCorreo(userIdentifier);
         if (usuario != null && usuario.getTipoProveedorAuth() != null) {
-            esUsuarioGoogle = usuario.getTipoProveedorAuth().getId() == ID_GOOGLE;
+            esGoogle = usuario.getTipoProveedorAuth().getId() == ID_GOOGLE;
         }
 
         return LogoutResDto.builder()
-                .correo(correoAutenticado)
-                .mensaje("Sesion invalidada exitosamente en el servidor.")
-                .requiereRevocacionGoogle(esUsuarioGoogle)
+                .correo(userIdentifier)
+                .mensaje("Sesión cerrada correctamente.")
+                .requiereRevocacionGoogle(esGoogle)
                 .build();
     }
 
@@ -162,9 +147,9 @@ public class AuthService {
                 .contrasenaHash(null)
                 .telefono(reqDto.getTelefono())
                 .fotoPerfilUrl(fotoUrl)
-                .tipoUsuario(resolveTipoUsuario(reqDto.getTipoUsuarioId()))
-                .usuarioEstado(resolveUsuarioEstado(ID_ACTIVO))
-                .tipoProveedorAuth(resolveTipoProveedorAuth(ID_GOOGLE))
+                .tipoUsuario(new TipoUsuario(reqDto.getTipoUsuarioId()))
+                .usuarioEstado(new UsuarioEstado(ID_ACTIVO))
+                .tipoProveedorAuth(new TipoProveedorAuth(ID_GOOGLE))
                 .providerId(googleSub)
                 .estado(ESTADO_LOGICO_ACTIVO)
                 .build();
@@ -178,7 +163,7 @@ public class AuthService {
         return AuthResDto.builder()
                 .id(savedUser.getId())
                 .email(savedUser.getCorreo())
-                .fullName(savedUser.getNombres() + " " + savedUser.getApellidos())
+                .fullName(construirNombreCompleto(savedUser.getNombres(), savedUser.getApellidos()))
                 .pictureUrl(savedUser.getFotoPerfilUrl())
                 .role(role)
                 .token(jwtToken)
@@ -202,9 +187,9 @@ public class AuthService {
                 .contrasenaHash(passwordEncoder.encode(reqDto.getContrasena()))
                 .telefono(reqDto.getTelefono())
                 .fotoPerfilUrl(reqDto.getFotoPerfilUrl())
-                .tipoUsuario(resolveTipoUsuario(reqDto.getTipoUsuarioId()))
-                .usuarioEstado(resolveUsuarioEstado(ID_ACTIVO))
-                .tipoProveedorAuth(resolveTipoProveedorAuth(ID_LOCAL))
+                .tipoUsuario(new TipoUsuario(reqDto.getTipoUsuarioId()))
+                .usuarioEstado(new UsuarioEstado(ID_ACTIVO))
+                .tipoProveedorAuth(new TipoProveedorAuth(ID_LOCAL))
                 .providerId(null)
                 .estado(ESTADO_LOGICO_ACTIVO)
                 .build();
@@ -218,22 +203,87 @@ public class AuthService {
         return AuthResDto.builder()
                 .id(savedUser.getId())
                 .email(savedUser.getCorreo())
-                .fullName(savedUser.getNombres() + " " + savedUser.getApellidos())
+                .fullName(construirNombreCompleto(savedUser.getNombres(), savedUser.getApellidos()))
                 .pictureUrl(savedUser.getFotoPerfilUrl())
                 .role(role)
                 .token(jwtToken)
                 .build();
     }
 
+    @Transactional
+    public ForgotPasswordResDto forgotPassword(ForgotPasswordReqDto reqDto) throws BadRequestException {
+        String normalizedEmail = reqDto.getCorreo().trim().toLowerCase();
+        Usuario usuario = usuarioRepository.findByCorreo(normalizedEmail);
+
+        if (usuario == null) {
+            return ForgotPasswordResDto.builder()
+                    .correo(normalizedEmail)
+                    .mensaje(MENSAJE_RECUPERACION_GENERICO)
+                    .build();
+        }
+
+        if (usuario.getTipoProveedorAuth() != null &&
+                usuario.getTipoProveedorAuth().getId() == ID_GOOGLE &&
+                !StringUtils.hasText(usuario.getContrasenaHash())) {
+            throw new BadRequestException("Esta cuenta fue registrada mediante Google Sign-In. Debe iniciar sesión utilizando Google.");
+        }
+
+        validarEstadoUsuario(usuario);
+
+        String resetToken = jwtTokenProvider.generatePasswordResetToken(usuario.getId(), usuario.getCorreo());
+        String fullName = construirNombreCompleto(usuario.getNombres(), usuario.getApellidos());
+
+        String htmlBody = String.format(
+                "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;'>"
+                        + "<h2 style='color: #2E7D32;'>PaseaPe - Recuperación de Contraseña</h2>"
+                        + "<p>Hola <strong>%s</strong>,</p>"
+                        + "<p>Hemos recibido una solicitud para restablecer la contraseña de tu cuenta.</p>"
+                        + "<p>Usa el siguiente token para cambiar tu contraseña en la app (válido por 15 minutos):</p>"
+                        + "<div style='background-color: #f4f6f8; padding: 12px; font-family: monospace; font-size: 13px; word-break: break-all; border-radius: 4px;'>%s</div>"
+                        + "<p style='margin-top: 20px; color: #666; font-size: 12px;'>Si no solicitaste este cambio, puedes ignorar este correo de forma segura.</p>"
+                        + "</div>",
+                fullName, resetToken
+        );
+
+        brevoEmailHttpRepository.sendEmail(
+                usuario,
+                usuario.getCorreo(),
+                fullName,
+                ASUNTO_RECUPERACION_CONTRASENA,
+                htmlBody,
+                NOTIF_RECUPERACION_CONTRASENA
+        );
+
+        return ForgotPasswordResDto.builder()
+                .correo(usuario.getCorreo())
+                .mensaje(MENSAJE_RECUPERACION_GENERICO)
+                .build();
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordReqDto reqDto) throws BadRequestException {
+        if (!jwtTokenProvider.validatePasswordResetToken(reqDto.getToken())) {
+            throw new BadRequestException("El token de restablecimiento es inválido o ha expirado.");
+        }
+
+        Long userId = jwtTokenProvider.getUserIdFromToken(reqDto.getToken());
+        Usuario usuario = usuarioRepository.findById(userId);
+
+        if (usuario == null) {
+            throw new BadRequestException("El usuario asociado al token no existe.");
+        }
+
+        if (usuario.getEstado() != null && usuario.getEstado() == ESTADO_LOGICO_INACTIVO) {
+            throw new BadRequestException("La cuenta de usuario se encuentra inactiva.");
+        }
+
+        usuario.setContrasenaHash(passwordEncoder.encode(reqDto.getNuevaContrasena()));
+        usuarioRepository.save(usuario);
+    }
+
     private void procesarSubtipo(Usuario usuario, UsuarioReqDto reqDto) throws BadRequestException {
         if (usuario.getTipoUsuario().getId() == ID_CLIENTE) {
-            DistritoLima distrito = null;
-            if (reqDto.getDistritoId() != null) {
-                distrito = distritoLimaRepository.findById(reqDto.getDistritoId());
-                if (distrito == null) {
-                    throw new BadRequestException("El distrito especificado con ID " + reqDto.getDistritoId() + " no existe.");
-                }
-            }
+            DistritoLima distrito = reqDto.getDistritoId() != null ? new DistritoLima(reqDto.getDistritoId()) : null;
 
             Cliente nuevoCliente = Cliente.builder()
                     .id(usuario.getId())
@@ -249,7 +299,6 @@ public class AuthService {
 
             Cliente savedCliente = clienteRepository.save(nuevoCliente);
 
-            // Inserción en lote si se enviaron mascotas
             if (reqDto.getMascotas() != null && !reqDto.getMascotas().isEmpty()) {
                 mascotaService.registrarMascotas(savedCliente, reqDto.getMascotas());
             }
@@ -262,23 +311,9 @@ public class AuthService {
                 }
             }
 
-            TipoDocumento tipoDoc = null;
-            if (reqDto.getTipoDocumentoId() != null) {
-                tipoDoc = tipoDocumentoRepository.findById(reqDto.getTipoDocumentoId());
-                if (tipoDoc == null) {
-                    throw new BadRequestException("El tipo de documento con ID " + reqDto.getTipoDocumentoId() + " no existe.");
-                }
-            }
-
-            DistritoLima distritoCobertura = null;
-            if (reqDto.getDistritoCoberturaId() != null) {
-                distritoCobertura = distritoLimaRepository.findById(reqDto.getDistritoCoberturaId());
-                if (distritoCobertura == null) {
-                    throw new BadRequestException("El distrito de cobertura con ID " + reqDto.getDistritoCoberturaId() + " no existe.");
-                }
-            }
-
-            PaseadorEstadoVerificacion estadoVerificacion = paseadorEstadoVerificacionRepository.findById(ID_PENDIENTE);
+            TipoDocumento tipoDoc = reqDto.getTipoDocumentoId() != null ? new TipoDocumento(reqDto.getTipoDocumentoId()) : null;
+            DistritoLima distritoCobertura = reqDto.getDistritoCoberturaId() != null ? new DistritoLima(reqDto.getDistritoCoberturaId()) : null;
+            PaseadorEstadoVerificacion estadoVerificacion = new PaseadorEstadoVerificacion(ID_PENDIENTE);
 
             Paseador nuevoPaseador = Paseador.builder()
                     .id(usuario.getId())
@@ -301,94 +336,13 @@ public class AuthService {
         }
     }
 
-    @Transactional
-    public ForgotPasswordResDto forgotPassword(ForgotPasswordReqDto reqDto) throws BadRequestException {
-        String normalizedEmail = reqDto.getCorreo().trim().toLowerCase();
-        Usuario usuario = usuarioRepository.findByCorreo(normalizedEmail);
-
-        // Prevención de enumeración de usuarios: Si no existe, se retorna el mensaje de éxito genérico
-        if (usuario == null) {
-            return ForgotPasswordResDto.builder()
-                    .correo(normalizedEmail)
-                    .mensaje("Si el correo se encuentra registrado en PaseaPe, recibira un mensaje con las instrucciones.")
-                    .build();
+    private void validarEstadoUsuario(Usuario usuario) throws BadRequestException {
+        if (usuario.getUsuarioEstado() != null && usuario.getUsuarioEstado().getId() == ID_BLOQUEADO) {
+            throw new BadRequestException("La cuenta de usuario se encuentra bloqueada.");
         }
-
-        // Si el usuario es exclusivo de Google y no tiene contraseña local
-        if (usuario.getTipoProveedorAuth() != null &&
-                usuario.getTipoProveedorAuth().getId() == ID_GOOGLE &&
-                !StringUtils.hasText(usuario.getContrasenaHash())) {
-            throw new BadRequestException("Esta cuenta fue registrada mediante Google Sign-In. Debe iniciar sesion utilizando el boton de Google.");
-        }
-
-        String resetToken = jwtTokenProvider.generatePasswordResetToken(usuario.getId(), usuario.getCorreo());
-        String fullName = (usuario.getNombres() != null ? usuario.getNombres() : "") +
-                (usuario.getApellidos() != null ? " " + usuario.getApellidos() : "");
-
-        String htmlBody = String.format(
-                "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px;'>"
-                        + "<h2 style='color: #2E7D32;'>PaseaPe - Recuperación de Contraseña</h2>"
-                        + "<p>Hola <strong>%s</strong>,</p>"
-                        + "<p>Hemos recibido una solicitud para restablecer la contraseña de tu cuenta.</p>"
-                        + "<p>Usa el siguiente token para cambiar tu contraseña en la app (valido por 15 minutos):</p>"
-                        + "<div style='background-color: #f4f6f8; padding: 12px; font-family: monospace; font-size: 13px; word-break: break-all; border-radius: 4px;'>%s</div>"
-                        + "<p style='margin-top: 20px; color: #666; font-size: 12px;'>Si no solicitaste este cambio, puedes ignorar este correo de forma segura.</p>"
-                        + "</div>",
-                fullName.trim(), resetToken
-        );
-
-        brevoEmailHttpRepository.sendEmail(
-                usuario,
-                usuario.getCorreo(),
-                fullName.trim(),
-                ASUNTO_RECUPERACION_CONTRASENA,
-                htmlBody,
-                NOTIF_RECUPERACION_CONTRASENA
-        );
-
-        return ForgotPasswordResDto.builder()
-                .correo(usuario.getCorreo())
-                .mensaje("Si el correo se encuentra registrado en PaseaPe, recibira un mensaje con las instrucciones.")
-                .build();
-    }
-
-    @Transactional
-    public void resetPassword(ResetPasswordReqDto reqDto) throws BadRequestException {
-        if (!jwtTokenProvider.validatePasswordResetToken(reqDto.getToken())) {
-            throw new BadRequestException("El token de restablecimiento es invalido o ha expirado.");
-        }
-
-        Long userId = jwtTokenProvider.getUserIdFromToken(reqDto.getToken());
-        Usuario usuario = usuarioRepository.findById(userId);
-
-        if (usuario == null) {
-            throw new BadRequestException("El usuario asociado al token no existe.");
-        }
-
-        if (usuario.getEstado() != null && usuario.getEstado() == 0) {
+        if (usuario.getEstado() != null && usuario.getEstado() == ESTADO_LOGICO_INACTIVO) {
             throw new BadRequestException("La cuenta de usuario se encuentra inactiva.");
         }
-
-        usuario.setContrasenaHash(passwordEncoder.encode(reqDto.getNuevaContrasena()));
-        usuarioRepository.save(usuario);
-    }
-
-    private TipoUsuario resolveTipoUsuario(Integer id) throws BadRequestException {
-        TipoUsuario entity = tipoUsuarioRepository.findById(id);
-        if (entity == null) throw new BadRequestException("El tipo de usuario indicado no existe.");
-        return entity;
-    }
-
-    private UsuarioEstado resolveUsuarioEstado(Integer id) throws BadRequestException {
-        UsuarioEstado entity = usuarioEstadoRepository.findById(id);
-        if (entity == null) throw new BadRequestException("El estado de usuario indicado no existe.");
-        return entity;
-    }
-
-    private TipoProveedorAuth resolveTipoProveedorAuth(Integer id) throws BadRequestException {
-        TipoProveedorAuth entity = tipoProveedorAuthRepository.findById(id);
-        if (entity == null) throw new BadRequestException("El proveedor de autenticación no existe.");
-        return entity;
     }
 
     private String resolveRoleName(Integer tipoUsuarioId) {

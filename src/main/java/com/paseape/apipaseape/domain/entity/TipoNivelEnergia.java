@@ -23,4 +23,8 @@ public class TipoNivelEnergia {
     private LocalDateTime actualizadoEl;
     private String creadoPor;
     private String actualizadoPor;
+
+    public TipoNivelEnergia(Integer id) {
+        this.id = id;
+    }
 }

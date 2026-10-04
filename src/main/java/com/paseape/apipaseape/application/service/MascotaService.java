@@ -7,11 +7,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.paseape.apipaseape.application.repository.IClienteRepository;
 import com.paseape.apipaseape.application.repository.IMascotaRepository;
-import com.paseape.apipaseape.application.repository.ITipoGeneroMascotaRepository;
-import com.paseape.apipaseape.application.repository.ITipoMascotaRepository;
-import com.paseape.apipaseape.application.repository.ITipoNivelEnergiaRepository;
-import com.paseape.apipaseape.application.repository.ITipoRazaRepository;
-import com.paseape.apipaseape.application.repository.ITipoTamanoMascotaRepository;
 import com.paseape.apipaseape.application.repository.IUsuarioRepository;
 import com.paseape.apipaseape.domain.entity.Cliente;
 import com.paseape.apipaseape.domain.entity.Mascota;
@@ -39,49 +34,19 @@ public class MascotaService {
     private final IMascotaRepository mascotaRepository;
     private final IUsuarioRepository usuarioRepository;
     private final IClienteRepository clienteRepository;
-    private final ITipoMascotaRepository tipoMascotaRepository;
-    private final ITipoRazaRepository tipoRazaRepository;
-    private final ITipoGeneroMascotaRepository tipoGeneroMascotaRepository;
-    private final ITipoTamanoMascotaRepository tipoTamanoMascotaRepository;
-    private final ITipoNivelEnergiaRepository tipoNivelEnergiaRepository;
     private final IMascotaDtoMapper mascotaDtoMapper;
 
     @Transactional
     public Mascota registrarMascota(Cliente cliente, MascotaReqDto dto) throws BadRequestException {
-        TipoMascota tipoMascota = tipoMascotaRepository.findById(dto.getTipoMascotaId());
-        if (tipoMascota == null) {
-            throw new BadRequestException("El tipo de mascota con ID " + dto.getTipoMascotaId() + " no existe.");
-        }
-
-        TipoRaza tipoRaza = tipoRazaRepository.findById(dto.getTipoRazaId());
-        if (tipoRaza == null) {
-            throw new BadRequestException("La raza con ID " + dto.getTipoRazaId() + " no existe.");
-        }
-
-        TipoGeneroMascota tipoGenero = tipoGeneroMascotaRepository.findById(dto.getTipoGeneroMascotaId());
-        if (tipoGenero == null) {
-            throw new BadRequestException("El género con ID " + dto.getTipoGeneroMascotaId() + " no existe.");
-        }
-
-        TipoTamanoMascota tipoTamano = tipoTamanoMascotaRepository.findById(dto.getTipoTamanoMascotaId());
-        if (tipoTamano == null) {
-            throw new BadRequestException("El tamaño con ID " + dto.getTipoTamanoMascotaId() + " no existe.");
-        }
-
-        TipoNivelEnergia tipoEnergia = tipoNivelEnergiaRepository.findById(dto.getTipoNivelEnergiaId());
-        if (tipoEnergia == null) {
-            throw new BadRequestException("El nivel de energía con ID " + dto.getTipoNivelEnergiaId() + " no existe.");
-        }
-
         Mascota mascota = Mascota.builder()
                 .uuid(UUID.randomUUID().toString())
                 .cliente(cliente)
                 .nombre(dto.getNombre().trim())
-                .tipoMascota(tipoMascota)
-                .tipoRaza(tipoRaza)
-                .tipoGeneroMascota(tipoGenero)
-                .tipoTamanoMascota(tipoTamano)
-                .tipoNivelEnergia(tipoEnergia)
+                .tipoMascota(new TipoMascota(dto.getTipoMascotaId()))
+                .tipoRaza(new TipoRaza(dto.getTipoRazaId()))
+                .tipoGeneroMascota(new TipoGeneroMascota(dto.getTipoGeneroMascotaId()))
+                .tipoTamanoMascota(new TipoTamanoMascota(dto.getTipoTamanoMascotaId()))
+                .tipoNivelEnergia(new TipoNivelEnergia(dto.getTipoNivelEnergiaId()))
                 .edadAnos(dto.getEdadAnos() != null ? dto.getEdadAnos() : 0)
                 .edadMeses(dto.getEdadMeses() != null ? dto.getEdadMeses() : 0)
                 .pesoKg(dto.getPesoKg())

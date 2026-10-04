@@ -164,4 +164,6 @@ public class Constant {
     //ESTADO LOGICO
     public static final int ESTADO_LOGICO_ACTIVO = 1;
     public static final int ESTADO_LOGICO_INACTIVO = 0;
+
+    public static final String MENSAJE_RECUPERACION_GENERICO = "Si el correo se encuentra registrado en PaseaPe, recibirás un mensaje con las instrucciones.";
 }

@@ -23,4 +23,8 @@ public class TipoProveedorAuth {
     private LocalDateTime actualizadoEl;
     private String creadoPor;
     private String actualizadoPor;
+
+    public TipoProveedorAuth(Integer id) {
+        this.id = id;
+    }
 }

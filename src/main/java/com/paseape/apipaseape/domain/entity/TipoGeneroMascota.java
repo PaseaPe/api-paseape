@@ -23,4 +23,8 @@ public class TipoGeneroMascota {
     private LocalDateTime actualizadoEl;
     private String creadoPor;
     private String actualizadoPor;
+
+    public TipoGeneroMascota(Integer id) {
+        this.id = id;
+    }
 }
