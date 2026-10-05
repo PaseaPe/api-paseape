@@ -22,7 +22,7 @@ public class PaseadorService {
     private final IUsuarioRepository usuarioRepository;
     private final IPaseadorDtoMapper paseadorDtoMapper;
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public PaseadorResDto cambiarDistritoCobertura(CambiarDistritoCoberturaReqDto reqDto) throws BadRequestException {
         Usuario usuario = usuarioRepository.findByUuid(reqDto.getUsuarioUuid().trim());
         if (usuario == null) {

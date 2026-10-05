@@ -102,6 +102,7 @@ public class AuthService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
     public LogoutResDto logout(String userIdentifier) {
         SecurityContextHolder.clearContext();
 
@@ -118,7 +119,7 @@ public class AuthService {
                 .build();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public AuthResDto registerWithGoogle(UsuarioReqDto reqDto) throws BadRequestException {
         GoogleIdToken.Payload payload = googleTokenVerifier.verify(reqDto.getIdToken());
         String email = payload.getEmail().trim().toLowerCase();
@@ -170,7 +171,7 @@ public class AuthService {
                 .build();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public AuthResDto registerLocal(UsuarioReqDto reqDto) throws BadRequestException {
         String normalizedEmail = reqDto.getCorreo().trim().toLowerCase();
 
@@ -210,7 +211,7 @@ public class AuthService {
                 .build();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public ForgotPasswordResDto forgotPassword(ForgotPasswordReqDto reqDto) throws BadRequestException {
         String normalizedEmail = reqDto.getCorreo().trim().toLowerCase();
         Usuario usuario = usuarioRepository.findByCorreo(normalizedEmail);
@@ -260,7 +261,7 @@ public class AuthService {
                 .build();
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void resetPassword(ResetPasswordReqDto reqDto) throws BadRequestException {
         if (!jwtTokenProvider.validatePasswordResetToken(reqDto.getToken())) {
             throw new BadRequestException("El token de restablecimiento es inválido o ha expirado.");

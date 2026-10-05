@@ -36,7 +36,7 @@ public class MascotaService {
     private final IClienteRepository clienteRepository;
     private final IMascotaDtoMapper mascotaDtoMapper;
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Mascota registrarMascota(Cliente cliente, MascotaReqDto dto) throws BadRequestException {
         Mascota mascota = Mascota.builder()
                 .uuid(UUID.randomUUID().toString())
@@ -61,7 +61,7 @@ public class MascotaService {
         return mascotaRepository.save(mascota);
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public List<Mascota> registrarMascotas(Cliente cliente, List<MascotaReqDto> dtos) throws BadRequestException {
         List<Mascota> guardadas = new ArrayList<>();
         if (dtos != null && !dtos.isEmpty()) {
@@ -74,7 +74,7 @@ public class MascotaService {
         return guardadas;
     }
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public MascotaResDto registrarMascotaUnitaria(RegistrarMascotaReqDto reqDto) throws BadRequestException {
         Usuario usuario = usuarioRepository.findByUuid(reqDto.getUsuarioUuid().trim());
         if (usuario == null) {

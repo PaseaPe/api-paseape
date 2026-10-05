@@ -9,11 +9,13 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "sistema_heartbeat")
+@SQLRestriction("estado = 1")
 @Getter
 @Setter
 @NoArgsConstructor
