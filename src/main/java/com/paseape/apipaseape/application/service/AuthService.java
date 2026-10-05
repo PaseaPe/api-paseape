@@ -287,7 +287,6 @@ public class AuthService {
             DistritoLima distrito = reqDto.getDistritoId() != null ? new DistritoLima(reqDto.getDistritoId()) : null;
 
             Cliente nuevoCliente = Cliente.builder()
-                    .id(usuario.getId())
                     .uuid(UUID.randomUUID().toString())
                     .usuario(usuario)
                     .direccionReferencia(reqDto.getDireccionReferencia())
@@ -317,7 +316,6 @@ public class AuthService {
             PaseadorEstadoVerificacion estadoVerificacion = new PaseadorEstadoVerificacion(ID_PENDIENTE);
 
             Paseador nuevoPaseador = Paseador.builder()
-                    .id(usuario.getId())
                     .uuid(UUID.randomUUID().toString())
                     .usuario(usuario)
                     .tipoDocumento(tipoDoc)

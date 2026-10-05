@@ -277,7 +277,7 @@ CREATE TABLE IF NOT EXISTS `paseape_db`.`usuarios`
 
 CREATE TABLE IF NOT EXISTS `paseape_db`.`clientes`
 (
-    `id`                            BIGINT       NOT NULL,
+    `id`                            BIGINT       NOT NULL AUTO_INCREMENT,
     `uuid`                          CHAR(36)     NOT NULL,
     `direccion_referencia`          VARCHAR(255) NULL,
     `distrito_id`                   INT          NULL,
@@ -309,7 +309,7 @@ CREATE TABLE IF NOT EXISTS `paseape_db`.`clientes`
 
 CREATE TABLE IF NOT EXISTS `paseape_db`.`paseadores`
 (
-    `id`                              BIGINT        NOT NULL,
+    `id`                              BIGINT        NOT NULL AUTO_INCREMENT,
     `uuid`                            CHAR(36)      NOT NULL,
     `tipo_documento_id`               INT           NULL,
     `numero_documento`                VARCHAR(20)   NULL,
@@ -359,7 +359,7 @@ CREATE TABLE IF NOT EXISTS `paseape_db`.`paseadores`
 
 CREATE TABLE IF NOT EXISTS `paseape_db`.`administradores`
 (
-    `id`                 BIGINT       NOT NULL,
+    `id`                 BIGINT       NOT NULL AUTO_INCREMENT,
     `uuid`               CHAR(36)     NOT NULL,
     `codigo_empleado`    VARCHAR(50)  NOT NULL,
     `area_departamento`  VARCHAR(100) NULL,
