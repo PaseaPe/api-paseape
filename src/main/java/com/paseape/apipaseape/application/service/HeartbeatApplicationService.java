@@ -14,7 +14,7 @@ public class HeartbeatApplicationService {
 
     private final ISistemaHeartbeatRepository heartbeatRepository;
 
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public void procesarLatido(String componente, String ipOrigen) {
         SistemaHeartbeat heartbeat = heartbeatRepository.findByComponente(componente);
 

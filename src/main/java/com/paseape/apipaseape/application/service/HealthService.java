@@ -4,6 +4,7 @@ import com.paseape.apipaseape.infrastructure.dto.response.DatabaseHealthResponse
 import com.paseape.apipaseape.infrastructure.dto.response.HealthResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -25,6 +26,7 @@ public class HealthService {
 
     private final DataSource dataSource;
 
+    @Transactional(readOnly = true)
     public HealthResponse checkHealth() {
         DatabaseHealthResponse dbStatus = evaluateDatabaseHealth();
         String overallStatus = STATUS_UP.equals(dbStatus.getStatus()) ? STATUS_UP : STATUS_DOWN;
