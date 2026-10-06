@@ -6,15 +6,18 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import com.paseape.apipaseape.application.service.AuthService;
+import com.paseape.apipaseape.domain.entity.Usuario;
 import com.paseape.apipaseape.infrastructure.constant.MessageCodes;
 import com.paseape.apipaseape.infrastructure.constant.StatusCodes;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
 import com.paseape.apipaseape.infrastructure.shared.RequestService;
 import com.paseape.apipaseape.infrastructure.validator.AuthValidator;
+import com.paseape.apipaseape.infrastructure.validator.PerfilValidator;
 
 import java.security.Principal;
 import java.util.Calendar;
@@ -27,6 +30,7 @@ public class AuthController extends BaseController {
 
     private final AuthService authService;
     private final AuthValidator authValidator;
+    private final PerfilValidator perfilValidator;
     private final RequestService requestService;
 
     @PostMapping("/google")
@@ -242,6 +246,77 @@ public class AuthController extends BaseController {
             response.setStatusCode(StatusCodes.Code500);
             response.setCode(MessageCodes.ResponseCodeE99);
             response.setMessage("Fallo interno al validar el token de sesion");
+            response.setHeader(requestService.getResponseHeader(Calendar.getInstance().getTime(), endDatetime));
+            return ResponseEntity.status(StatusCodes.Code500).body(response);
+        }
+    }
+
+    @PutMapping("/profile")
+    public ResponseEntity<ResponseDto<PerfilResDto>> actualizarPerfil(Principal principal, @RequestBody ActualizarPerfilReqDto request) {
+        var response = new ResponseDto<PerfilResDto>();
+        try {
+            Date startDatetime = Calendar.getInstance().getTime();
+
+            if (principal == null || principal.getName() == null) {
+                Date endDatetime = Calendar.getInstance().getTime();
+                response.setStatusCode(StatusCodes.Code401);
+                response.setCode(MessageCodes.ResponseCodeE01);
+                response.setMessage("No se encontro una sesion activa autenticada");
+                response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
+                return ResponseEntity.status(response.getStatusCode()).body(response);
+            }
+
+            // El Principal del filtro JWT es el correo del usuario autenticado
+            Usuario usuario = authService.obtenerUsuarioPorCorreo(principal.getName());
+            if (usuario == null) {
+                Date endDatetime = Calendar.getInstance().getTime();
+                response.setStatusCode(StatusCodes.Code404);
+                response.setCode(MessageCodes.ResponseCodeBR98);
+                response.setMessage("Usuario no encontrado");
+                response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
+                return ResponseEntity.status(response.getStatusCode()).body(response);
+            }
+
+            Long userId = usuario.getId();
+            Integer tipoUsuarioId = usuario.getTipoUsuario() != null ? usuario.getTipoUsuario().getId() : null;
+
+            ErrorDetailDto validationError = perfilValidator.validateActualizarPerfil(request, tipoUsuarioId);
+            if (validationError != null) {
+                Date endDatetime = Calendar.getInstance().getTime();
+                response.setStatusCode(validationError.getStatusCode());
+                response.setCode(validationError.getCode());
+                response.setMessage(validationError.getMessage());
+                response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
+                return ResponseEntity.status(response.getStatusCode()).body(response);
+            }
+
+            PerfilResDto perfilResDto = authService.actualizarPerfil(userId, request);
+
+            Date endDatetime = Calendar.getInstance().getTime();
+            HeaderDto headerDto = requestService.getResponseHeader(startDatetime, endDatetime);
+
+            response.setStatusCode(StatusCodes.Code200);
+            response.setCode(MessageCodes.ResponseCodeS00);
+            response.setMessage("Perfil actualizado exitosamente");
+            response.setHeader(headerDto);
+            response.setResponse(perfilResDto);
+            return ResponseEntity.status(response.getStatusCode()).body(response);
+        } catch (BadRequestException ex) {
+            String method = new Object() {}.getClass().getEnclosingMethod().getName();
+            logControllerError(logger, ex, this, method, "correo=" + (principal != null ? principal.getName() : "null"));
+            Date endDatetime = Calendar.getInstance().getTime();
+            response.setStatusCode(StatusCodes.Code400);
+            response.setCode(ex.code != null ? ex.code : MessageCodes.ResponseCodeBR01);
+            response.setMessage(ex.getMessage());
+            response.setHeader(requestService.getResponseHeader(Calendar.getInstance().getTime(), endDatetime));
+            return ResponseEntity.status(StatusCodes.Code400).body(response);
+        } catch (Exception ex) {
+            String method = new Object() {}.getClass().getEnclosingMethod().getName();
+            logControllerError(logger, ex, this, method, "correo=" + (principal != null ? principal.getName() : "null"));
+            Date endDatetime = Calendar.getInstance().getTime();
+            response.setStatusCode(StatusCodes.Code500);
+            response.setCode(MessageCodes.ResponseCodeE99);
+            response.setMessage("Error interno al actualizar el perfil");
             response.setHeader(requestService.getResponseHeader(Calendar.getInstance().getTime(), endDatetime));
             return ResponseEntity.status(StatusCodes.Code500).body(response);
         }

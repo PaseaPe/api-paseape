@@ -12,6 +12,7 @@ import org.springframework.util.StringUtils;
 import com.paseape.apipaseape.application.repository.IClienteRepository;
 import com.paseape.apipaseape.application.repository.IPaseadorRepository;
 import com.paseape.apipaseape.application.repository.IUsuarioRepository;
+import com.paseape.apipaseape.infrastructure.dto.request.ActualizarPerfilReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.ForgotPasswordReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.GoogleAuthReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.LoginReqDto;
@@ -20,7 +21,9 @@ import com.paseape.apipaseape.infrastructure.dto.request.UsuarioReqDto;
 import com.paseape.apipaseape.infrastructure.dto.response.AuthResDto;
 import com.paseape.apipaseape.infrastructure.dto.response.ForgotPasswordResDto;
 import com.paseape.apipaseape.infrastructure.dto.response.LogoutResDto;
+import com.paseape.apipaseape.infrastructure.dto.response.PerfilResDto;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
+import com.paseape.apipaseape.infrastructure.mapper.dto.IPerfilDtoMapper;
 import com.paseape.apipaseape.infrastructure.repository.http.BrevoEmailHttpRepository;
 import com.paseape.apipaseape.infrastructure.repository.http.GoogleTokenVerifierHttpRepository;
 import com.paseape.apipaseape.infrastructure.security.JwtTokenProvider;
@@ -43,6 +46,7 @@ public class AuthService {
     private final IUsuarioRepository usuarioRepository;
     private final IClienteRepository clienteRepository;
     private final IPaseadorRepository paseadorRepository;
+    private final IPerfilDtoMapper perfilDtoMapper;
 
     @Transactional(readOnly = true)
     public AuthResDto authenticateWithGoogle(GoogleAuthReqDto reqDto) throws BadRequestException {
@@ -261,6 +265,14 @@ public class AuthService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public Usuario obtenerUsuarioPorCorreo(String correo) {
+        if (!StringUtils.hasText(correo)) {
+            return null;
+        }
+        return usuarioRepository.findByCorreo(correo.trim().toLowerCase());
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public void resetPassword(ResetPasswordReqDto reqDto) throws BadRequestException {
         if (!jwtTokenProvider.validatePasswordResetToken(reqDto.getToken())) {
@@ -280,6 +292,90 @@ public class AuthService {
 
         usuario.setContrasenaHash(passwordEncoder.encode(reqDto.getNuevaContrasena()));
         usuarioRepository.save(usuario);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public PerfilResDto actualizarPerfil(Long userId, ActualizarPerfilReqDto reqDto) throws BadRequestException {
+        Usuario usuario = usuarioRepository.findById(userId);
+        if (usuario == null) {
+            throw new BadRequestException("El usuario no existe.");
+        }
+
+        validarEstadoUsuario(usuario);
+
+        // Actualizar campos base de usuario
+        if (StringUtils.hasText(reqDto.getNombres())) {
+            usuario.setNombres(reqDto.getNombres().trim());
+        }
+        if (StringUtils.hasText(reqDto.getApellidos())) {
+            usuario.setApellidos(reqDto.getApellidos().trim());
+        }
+        if (StringUtils.hasText(reqDto.getTelefono())) {
+            usuario.setTelefono(reqDto.getTelefono().trim());
+        }
+        if (StringUtils.hasText(reqDto.getFotoPerfilUrl())) {
+            usuario.setFotoPerfilUrl(reqDto.getFotoPerfilUrl().trim());
+        }
+
+        Usuario usuarioGuardado = usuarioRepository.save(usuario);
+
+        // Actualizar subtipo e hidratar la respuesta según el tipo de usuario
+        Integer tipoUsuarioId = usuarioGuardado.getTipoUsuario() != null ? usuarioGuardado.getTipoUsuario().getId() : null;
+        PerfilResDto perfilResDto = perfilDtoMapper.toPerfilResDto(usuarioGuardado);
+
+        if (tipoUsuarioId != null && tipoUsuarioId == ID_CLIENTE) {
+            Cliente clienteActualizado = actualizarCliente(usuarioGuardado, reqDto);
+            perfilDtoMapper.enrichClienteFields(clienteActualizado, perfilResDto);
+        } else if (tipoUsuarioId != null && tipoUsuarioId == ID_PASEADOR) {
+            Paseador paseadorActualizado = actualizarPaseador(usuarioGuardado, reqDto);
+            perfilDtoMapper.enrichPaseadorFields(paseadorActualizado, perfilResDto);
+        }
+
+        return perfilResDto;
+    }
+
+    private Cliente actualizarCliente(Usuario usuario, ActualizarPerfilReqDto reqDto) throws BadRequestException {
+        Cliente cliente = clienteRepository.findById(usuario.getId());
+        if (cliente == null) {
+            throw new BadRequestException("El perfil de cliente no existe.");
+        }
+
+        if (StringUtils.hasText(reqDto.getDireccionReferencia())) {
+            cliente.setDireccionReferencia(reqDto.getDireccionReferencia().trim());
+        }
+        if (reqDto.getDistritoId() != null) {
+            cliente.setDistrito(new DistritoLima(reqDto.getDistritoId()));
+        }
+        if (StringUtils.hasText(reqDto.getContactoEmergenciaNombre())) {
+            cliente.setContactoEmergenciaNombre(reqDto.getContactoEmergenciaNombre().trim());
+        }
+        if (StringUtils.hasText(reqDto.getContactoEmergenciaTelefono())) {
+            cliente.setContactoEmergenciaTelefono(reqDto.getContactoEmergenciaTelefono().trim());
+        }
+        if (StringUtils.hasText(reqDto.getNotasAdicionales())) {
+            cliente.setNotasAdicionales(reqDto.getNotasAdicionales().trim());
+        }
+
+        return clienteRepository.save(cliente);
+    }
+
+    private Paseador actualizarPaseador(Usuario usuario, ActualizarPerfilReqDto reqDto) throws BadRequestException {
+        Paseador paseador = paseadorRepository.findById(usuario.getId());
+        if (paseador == null) {
+            throw new BadRequestException("El perfil de paseador no existe.");
+        }
+
+        if (StringUtils.hasText(reqDto.getBiografia())) {
+            paseador.setBiografia(reqDto.getBiografia().trim());
+        }
+        if (reqDto.getTarifaHoraPen() != null) {
+            paseador.setTarifaHoraPen(reqDto.getTarifaHoraPen());
+        }
+        if (reqDto.getDistritoCoberturaId() != null) {
+            paseador.setDistritoCobertura(new DistritoLima(reqDto.getDistritoCoberturaId()));
+        }
+
+        return paseadorRepository.save(paseador);
     }
 
     private void procesarSubtipo(Usuario usuario, UsuarioReqDto reqDto) throws BadRequestException {
