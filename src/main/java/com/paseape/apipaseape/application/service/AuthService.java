@@ -441,6 +441,9 @@ public class AuthService {
     }
 
     private String resolveRoleName(Integer tipoUsuarioId) {
+        if (tipoUsuarioId != null && tipoUsuarioId == ID_ADMINISTRADOR) {
+            return ROL_ADMINISTRADOR;
+        }
         if (tipoUsuarioId != null && tipoUsuarioId == ID_PASEADOR) {
             return ROL_PASEADOR;
         }
