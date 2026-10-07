@@ -1,5 +1,6 @@
 package com.paseape.apipaseape.infrastructure.repository.jpa;
 
+import com.paseape.apipaseape.infrastructure.entity.PaseadorEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -11,6 +12,8 @@ import java.util.List;
 public interface IAdministradorJpaRepository extends JpaRepository<AdministradorEntity, Long> {
 
     AdministradorEntity findById(long id);
+
+    AdministradorEntity findByUsuarioId(long usuarioId);
 
     AdministradorEntity findByUuid(String uuid);
 

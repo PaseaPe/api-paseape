@@ -12,6 +12,8 @@ public interface IPaseadorJpaRepository extends JpaRepository<PaseadorEntity, Lo
 
     PaseadorEntity findById(long id);
 
+    PaseadorEntity findByUsuarioId(long usuarioId);
+
     PaseadorEntity findByUuid(String uuid);
 
     PaseadorEntity findByNumeroDocumento(String numeroDocumento);

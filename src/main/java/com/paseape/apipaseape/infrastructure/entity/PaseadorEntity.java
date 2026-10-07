@@ -1,13 +1,6 @@
 package com.paseape.apipaseape.infrastructure.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -36,7 +29,7 @@ public class PaseadorEntity extends Auditable {
     private String uuid;
 
     @ManyToOne
-    @JoinColumn(name = "id", insertable = false, updatable = false)
+    @JoinColumn(name = "usuario_id", nullable = false)
     private UsuarioEntity usuario;
 
     @ManyToOne
@@ -49,7 +42,7 @@ public class PaseadorEntity extends Auditable {
     @Column(name = "antecedentes_policiales_url")
     private String antecedentesPolicialesUrl;
 
-    @Column(name = "experiencia_años")
+    @Column(name = "experiencia_anos")
     private Integer experienciaAnos;
 
     @Column(name = "biografia", columnDefinition = "TEXT")

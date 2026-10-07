@@ -2,7 +2,6 @@ package com.paseape.apipaseape.infrastructure.repository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.paseape.apipaseape.application.repository.IMascotaRepository;
 import com.paseape.apipaseape.domain.entity.Mascota;
@@ -20,7 +19,6 @@ public class MascotaRepository implements IMascotaRepository {
     private final IMascotaDboMapper mapper;
 
     @Override
-    @Transactional(readOnly = true)
     public Mascota findById(Long id) {
         if (id == null) {
             return null;
@@ -30,7 +28,6 @@ public class MascotaRepository implements IMascotaRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public Mascota findByUuid(String uuid) {
         if (uuid == null || uuid.trim().isEmpty()) {
             return null;
@@ -40,7 +37,6 @@ public class MascotaRepository implements IMascotaRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<Mascota> findAllByClienteId(Long clienteId) {
         if (clienteId == null) {
             return List.of();
@@ -50,7 +46,6 @@ public class MascotaRepository implements IMascotaRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<Mascota> findAllByClienteIdAndEstado(Long clienteId, Integer estado) {
         if (clienteId == null) {
             return List.of();
@@ -60,14 +55,12 @@ public class MascotaRepository implements IMascotaRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<Mascota> findAllByEstado(Integer estado) {
         List<MascotaEntity> entities = jpaRepository.findByEstado(estado);
         return mapper.toDomainList(entities);
     }
 
     @Override
-    @Transactional
     public Mascota save(Mascota mascota) {
         MascotaEntity entity = mapper.toEntity(mascota);
         MascotaEntity savedEntity = jpaRepository.save(entity);

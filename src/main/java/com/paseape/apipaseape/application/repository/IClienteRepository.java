@@ -8,6 +8,8 @@ public interface IClienteRepository {
 
     Cliente findById(Long id);
 
+    Cliente findByUsuarioId(Long usuarioId);
+
     Cliente findByUuid(String uuid);
 
     List<Cliente> findAllByDistritoId(Integer distritoId);
