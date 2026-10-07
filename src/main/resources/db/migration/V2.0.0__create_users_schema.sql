@@ -213,8 +213,6 @@ CREATE TABLE IF NOT EXISTS `paseape_db`.`tipo_raza`
     CONSTRAINT `fk_tipo_raza_tipo_mascota`
     FOREIGN KEY (`tipo_mascota_id`)
     REFERENCES `paseape_db`.`tipo_mascota` (`id`)
-    ON DELETE RESTRICT
-    ON UPDATE CASCADE
     )
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
@@ -253,32 +251,27 @@ CREATE TABLE IF NOT EXISTS `paseape_db`.`usuarios`
     INDEX `idx_usuarios_tipo_prov_auth` (`tipo_proveedor_auth_id` ASC),
     CONSTRAINT `fk_usuarios_tipo_usuario`
     FOREIGN KEY (`tipo_usuario_id`)
-    REFERENCES `paseape_db`.`tipo_usuario` (`id`)
-    ON DELETE RESTRICT
-    ON UPDATE CASCADE,
+    REFERENCES `paseape_db`.`tipo_usuario` (`id`),
     CONSTRAINT `fk_usuarios_usuario_estado`
     FOREIGN KEY (`usuario_estado_id`)
-    REFERENCES `paseape_db`.`usuario_estado` (`id`)
-    ON DELETE RESTRICT
-    ON UPDATE CASCADE,
+    REFERENCES `paseape_db`.`usuario_estado` (`id`),
     CONSTRAINT `fk_usuarios_tipo_proveedor_auth`
     FOREIGN KEY (`tipo_proveedor_auth_id`)
     REFERENCES `paseape_db`.`tipo_proveedor_auth` (`id`)
-    ON DELETE RESTRICT
-    ON UPDATE CASCADE
     )
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_unicode_ci;
 
 -- -----------------------------------------------------------------------------
--- 4. TABLAS DE EXTENSIÓN / SUBTIPOS (1 A 1 VÍA SHARED PRIMARY KEY)
+-- 4. TABLAS DE EXTENSIÓN / SUBTIPOS (1 A 1 CON ID PROPIO Y FK UNICA A USUARIOS)
 -- -----------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS `paseape_db`.`clientes`
 (
     `id`                            BIGINT       NOT NULL AUTO_INCREMENT,
     `uuid`                          CHAR(36)     NOT NULL,
+    `usuario_id`                    BIGINT       NOT NULL,
     `direccion_referencia`          VARCHAR(255) NULL,
     `distrito_id`                   INT          NULL,
     `contacto_emergencia_nombre`    VARCHAR(100) NULL,
@@ -291,17 +284,14 @@ CREATE TABLE IF NOT EXISTS `paseape_db`.`clientes`
     `estado`                        BIT          NOT NULL DEFAULT 1,
     PRIMARY KEY (`id`),
     UNIQUE INDEX `uuid_cliente_unq` (`uuid` ASC),
+    UNIQUE INDEX `usuario_id_cliente_unq` (`usuario_id` ASC),
     INDEX `idx_clientes_distrito` (`distrito_id` ASC),
     CONSTRAINT `fk_clientes_usuarios`
-    FOREIGN KEY (`id`)
-    REFERENCES `paseape_db`.`usuarios` (`id`)
-    ON DELETE RESTRICT
-    ON UPDATE CASCADE,
+    FOREIGN KEY (`usuario_id`)
+    REFERENCES `paseape_db`.`usuarios` (`id`),
     CONSTRAINT `fk_clientes_distritos_lima`
     FOREIGN KEY (`distrito_id`)
     REFERENCES `paseape_db`.`distritos_lima` (`id`)
-    ON DELETE RESTRICT
-    ON UPDATE CASCADE
     )
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
@@ -311,10 +301,11 @@ CREATE TABLE IF NOT EXISTS `paseape_db`.`paseadores`
 (
     `id`                              BIGINT        NOT NULL AUTO_INCREMENT,
     `uuid`                            CHAR(36)      NOT NULL,
+    `usuario_id`                      BIGINT        NOT NULL,
     `tipo_documento_id`               INT           NULL,
     `numero_documento`                VARCHAR(20)   NULL,
     `antecedentes_policiales_url`     VARCHAR(255)  NULL,
-    `experiencia_años`                INT           NULL DEFAULT 0,
+    `experiencia_anos`                INT           NULL DEFAULT 0,
     `biografia`                       TEXT          NULL,
     `tarifa_hora_pen`                 DECIMAL(10,2) NULL,
     `distrito_cobertura_id`           INT           NULL,
@@ -328,30 +319,23 @@ CREATE TABLE IF NOT EXISTS `paseape_db`.`paseadores`
     `estado`                          BIT           NOT NULL DEFAULT 1,
     PRIMARY KEY (`id`),
     UNIQUE INDEX `uuid_paseador_unq` (`uuid` ASC),
+    UNIQUE INDEX `usuario_id_paseador_unq` (`usuario_id` ASC),
     UNIQUE INDEX `numero_documento_paseador_unq` (`numero_documento` ASC),
     INDEX `idx_paseadores_tipo_documento` (`tipo_documento_id` ASC),
     INDEX `idx_paseadores_distrito_cobertura` (`distrito_cobertura_id` ASC),
     INDEX `idx_paseadores_estado_verificacion` (`paseador_estado_verificacion_id` ASC),
     CONSTRAINT `fk_paseadores_usuarios`
-    FOREIGN KEY (`id`)
-    REFERENCES `paseape_db`.`usuarios` (`id`)
-    ON DELETE RESTRICT
-    ON UPDATE CASCADE,
+    FOREIGN KEY (`usuario_id`)
+    REFERENCES `paseape_db`.`usuarios` (`id`),
     CONSTRAINT `fk_paseadores_tipo_documento`
     FOREIGN KEY (`tipo_documento_id`)
-    REFERENCES `paseape_db`.`tipo_documento` (`id`)
-    ON DELETE RESTRICT
-    ON UPDATE CASCADE,
+    REFERENCES `paseape_db`.`tipo_documento` (`id`),
     CONSTRAINT `fk_paseadores_distritos_lima`
     FOREIGN KEY (`distrito_cobertura_id`)
-    REFERENCES `paseape_db`.`distritos_lima` (`id`)
-    ON DELETE RESTRICT
-    ON UPDATE CASCADE,
+    REFERENCES `paseape_db`.`distritos_lima` (`id`),
     CONSTRAINT `fk_paseadores_estado_verificacion`
     FOREIGN KEY (`paseador_estado_verificacion_id`)
     REFERENCES `paseape_db`.`paseador_estado_verificacion` (`id`)
-    ON DELETE RESTRICT
-    ON UPDATE CASCADE
     )
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
@@ -361,6 +345,7 @@ CREATE TABLE IF NOT EXISTS `paseape_db`.`administradores`
 (
     `id`                 BIGINT       NOT NULL AUTO_INCREMENT,
     `uuid`               CHAR(36)     NOT NULL,
+    `usuario_id`         BIGINT       NOT NULL,
     `codigo_empleado`    VARCHAR(50)  NOT NULL,
     `area_departamento`  VARCHAR(100) NULL,
     `superadmin`         BIT          NOT NULL DEFAULT 0,
@@ -371,12 +356,11 @@ CREATE TABLE IF NOT EXISTS `paseape_db`.`administradores`
     `estado`             BIT          NOT NULL DEFAULT 1,
     PRIMARY KEY (`id`),
     UNIQUE INDEX `uuid_administrador_unq` (`uuid` ASC),
+    UNIQUE INDEX `usuario_id_admin_unq` (`usuario_id` ASC),
     UNIQUE INDEX `codigo_empleado_admin_unq` (`codigo_empleado` ASC),
     CONSTRAINT `fk_administradores_usuarios`
-    FOREIGN KEY (`id`)
+    FOREIGN KEY (`usuario_id`)
     REFERENCES `paseape_db`.`usuarios` (`id`)
-    ON DELETE RESTRICT
-    ON UPDATE CASCADE
     )
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
@@ -397,7 +381,7 @@ CREATE TABLE IF NOT EXISTS `paseape_db`.`mascotas`
     `tipo_genero_mascota_id`  INT           NOT NULL,
     `tipo_tamaño_mascota_id`  INT           NOT NULL,
     `tipo_nivel_energia_id`   INT           NOT NULL,
-    `edad_años`               INT           NULL DEFAULT 0,
+    `edad_anos`               INT           NULL DEFAULT 0,
     `edad_meses`              INT           NULL DEFAULT 0,
     `peso_kg`                 DECIMAL(5,2)  NULL,
     `esterilizado`            BIT           NOT NULL DEFAULT 0,
@@ -420,34 +404,22 @@ CREATE TABLE IF NOT EXISTS `paseape_db`.`mascotas`
     INDEX `idx_mascotas_tipo_nivel_energia` (`tipo_nivel_energia_id` ASC),
     CONSTRAINT `fk_mascotas_clientes`
     FOREIGN KEY (`cliente_id`)
-    REFERENCES `paseape_db`.`clientes` (`id`)
-    ON DELETE RESTRICT
-    ON UPDATE CASCADE,
+    REFERENCES `paseape_db`.`clientes` (`id`),
     CONSTRAINT `fk_mascotas_tipo_mascota`
     FOREIGN KEY (`tipo_mascota_id`)
-    REFERENCES `paseape_db`.`tipo_mascota` (`id`)
-    ON DELETE RESTRICT
-    ON UPDATE CASCADE,
+    REFERENCES `paseape_db`.`tipo_mascota` (`id`),
     CONSTRAINT `fk_mascotas_tipo_raza`
     FOREIGN KEY (`tipo_raza_id`)
-    REFERENCES `paseape_db`.`tipo_raza` (`id`)
-    ON DELETE RESTRICT
-    ON UPDATE CASCADE,
+    REFERENCES `paseape_db`.`tipo_raza` (`id`),
     CONSTRAINT `fk_mascotas_tipo_genero`
     FOREIGN KEY (`tipo_genero_mascota_id`)
-    REFERENCES `paseape_db`.`tipo_genero_mascota` (`id`)
-    ON DELETE RESTRICT
-    ON UPDATE CASCADE,
+    REFERENCES `paseape_db`.`tipo_genero_mascota` (`id`),
     CONSTRAINT `fk_mascotas_tipo_tamano`
     FOREIGN KEY (`tipo_tamaño_mascota_id`)
-    REFERENCES `paseape_db`.`tipo_tamaño_mascota` (`id`)
-    ON DELETE RESTRICT
-    ON UPDATE CASCADE,
+    REFERENCES `paseape_db`.`tipo_tamaño_mascota` (`id`),
     CONSTRAINT `fk_mascotas_tipo_nivel_energia`
     FOREIGN KEY (`tipo_nivel_energia_id`)
     REFERENCES `paseape_db`.`tipo_nivel_energia` (`id`)
-    ON DELETE RESTRICT
-    ON UPDATE CASCADE
     )
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4

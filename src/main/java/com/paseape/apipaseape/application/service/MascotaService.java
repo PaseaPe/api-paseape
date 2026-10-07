@@ -96,7 +96,7 @@ public class MascotaService {
             throw new BadRequestException("No existe un usuario con el UUID: " + reqDto.getUsuarioUuid());
         }
 
-        Cliente cliente = clienteRepository.findById(usuario.getId());
+        Cliente cliente = clienteRepository.findByUsuarioId(usuario.getId());
         if (cliente == null) {
             throw new BadRequestException("El usuario especificado no posee un perfil de cliente registrado.");
         }

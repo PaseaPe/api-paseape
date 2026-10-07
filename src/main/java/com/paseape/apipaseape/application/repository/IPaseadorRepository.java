@@ -8,6 +8,8 @@ public interface IPaseadorRepository {
 
     Paseador findById(Long id);
 
+    Paseador findByUsuarioId(Long usuarioId);
+
     Paseador findByUuid(String uuid);
 
     Paseador findByNumeroDocumento(String numeroDocumento);

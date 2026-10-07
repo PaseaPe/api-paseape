@@ -2,7 +2,6 @@ package com.paseape.apipaseape.infrastructure.repository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.paseape.apipaseape.application.repository.ITipoProveedorAuthRepository;
 import com.paseape.apipaseape.domain.entity.TipoProveedorAuth;
@@ -20,7 +19,6 @@ public class TipoProveedorAuthRepository implements ITipoProveedorAuthRepository
     private final ITipoProveedorAuthDboMapper mapper;
 
     @Override
-    @Transactional(readOnly = true)
     public TipoProveedorAuth findById(Integer id) {
         if (id == null) {
             return null;
@@ -30,7 +28,6 @@ public class TipoProveedorAuthRepository implements ITipoProveedorAuthRepository
     }
 
     @Override
-    @Transactional(readOnly = true)
     public TipoProveedorAuth findByUuid(String uuid) {
         if (uuid == null || uuid.trim().isEmpty()) {
             return null;
@@ -40,7 +37,6 @@ public class TipoProveedorAuthRepository implements ITipoProveedorAuthRepository
     }
 
     @Override
-    @Transactional(readOnly = true)
     public TipoProveedorAuth findByDescripcion(String descripcion) {
         if (descripcion == null || descripcion.trim().isEmpty()) {
             return null;
@@ -50,14 +46,12 @@ public class TipoProveedorAuthRepository implements ITipoProveedorAuthRepository
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<TipoProveedorAuth> findAllByEstado(Integer estado) {
         List<TipoProveedorAuthEntity> entities = jpaRepository.findByEstado(estado);
         return mapper.toDomainList(entities);
     }
 
     @Override
-    @Transactional
     public TipoProveedorAuth save(TipoProveedorAuth tipoProveedorAuth) {
         TipoProveedorAuthEntity entity = mapper.toEntity(tipoProveedorAuth);
         TipoProveedorAuthEntity savedEntity = jpaRepository.save(entity);

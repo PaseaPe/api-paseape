@@ -17,4 +17,6 @@ public interface IClienteJpaRepository extends JpaRepository<ClienteEntity, Long
     List<ClienteEntity> findByDistritoId(Integer distritoId);
 
     List<ClienteEntity> findByEstado(Integer estado);
+
+    ClienteEntity findByUsuarioId(long usuarioId);
 }
