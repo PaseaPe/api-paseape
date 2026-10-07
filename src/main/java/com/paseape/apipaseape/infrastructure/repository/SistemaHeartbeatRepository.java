@@ -6,7 +6,6 @@ import com.paseape.apipaseape.infrastructure.mapper.entity.ISistemaHeartbeatDboM
 import com.paseape.apipaseape.infrastructure.repository.jpa.ISistemaHeartbeatJpaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 import com.paseape.apipaseape.application.repository.ISistemaHeartbeatRepository;
 
 @Repository
@@ -17,14 +16,12 @@ public class SistemaHeartbeatRepository implements ISistemaHeartbeatRepository {
     private final ISistemaHeartbeatDboMapper mapper;
 
     @Override
-    @Transactional(readOnly = true)
     public SistemaHeartbeat findByComponente(String componente) {
         SistemaHeartbeatEntity entity = jpaRepository.findByComponente(componente);
         return entity != null ? mapper.toDomain(entity) : null;
     }
 
     @Override
-    @Transactional
     public SistemaHeartbeat save(SistemaHeartbeat heartbeat) {
         SistemaHeartbeatEntity entity = mapper.toEntity(heartbeat);
         SistemaHeartbeatEntity savedEntity = jpaRepository.save(entity);

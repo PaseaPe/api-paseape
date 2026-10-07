@@ -29,7 +29,7 @@ public class PaseadorService {
             throw new BadRequestException("El usuario especificado no existe.");
         }
 
-        Paseador paseador = paseadorRepository.findById(usuario.getId());
+        Paseador paseador = paseadorRepository.findByUsuarioId(usuario.getId());
         if (paseador == null) {
             throw new BadRequestException("El usuario no cuenta con un perfil de paseador registrado.");
         }

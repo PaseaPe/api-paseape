@@ -2,7 +2,6 @@ package com.paseape.apipaseape.infrastructure.repository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.paseape.apipaseape.application.repository.ITipoNivelEnergiaRepository;
 import com.paseape.apipaseape.domain.entity.TipoNivelEnergia;
@@ -20,7 +19,6 @@ public class TipoNivelEnergiaRepository implements ITipoNivelEnergiaRepository {
     private final ITipoNivelEnergiaDboMapper mapper;
 
     @Override
-    @Transactional(readOnly = true)
     public TipoNivelEnergia findById(Integer id) {
         if (id == null) {
             return null;
@@ -30,7 +28,6 @@ public class TipoNivelEnergiaRepository implements ITipoNivelEnergiaRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public TipoNivelEnergia findByUuid(String uuid) {
         if (uuid == null || uuid.trim().isEmpty()) {
             return null;
@@ -40,7 +37,6 @@ public class TipoNivelEnergiaRepository implements ITipoNivelEnergiaRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public TipoNivelEnergia findByDescripcion(String descripcion) {
         if (descripcion == null || descripcion.trim().isEmpty()) {
             return null;
@@ -50,14 +46,12 @@ public class TipoNivelEnergiaRepository implements ITipoNivelEnergiaRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<TipoNivelEnergia> findAllByEstado(Integer estado) {
         List<TipoNivelEnergiaEntity> entities = jpaRepository.findByEstado(estado);
         return mapper.toDomainList(entities);
     }
 
     @Override
-    @Transactional
     public TipoNivelEnergia save(TipoNivelEnergia tipoNivelEnergia) {
         TipoNivelEnergiaEntity entity = mapper.toEntity(tipoNivelEnergia);
         TipoNivelEnergiaEntity savedEntity = jpaRepository.save(entity);

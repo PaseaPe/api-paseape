@@ -2,7 +2,6 @@ package com.paseape.apipaseape.infrastructure.repository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.paseape.apipaseape.application.repository.IPaseadorRepository;
 import com.paseape.apipaseape.domain.entity.Paseador;
@@ -20,7 +19,6 @@ public class PaseadorRepository implements IPaseadorRepository {
     private final IPaseadorDboMapper mapper;
 
     @Override
-    @Transactional(readOnly = true)
     public Paseador findById(Long id) {
         if (id == null) {
             return null;
@@ -30,7 +28,15 @@ public class PaseadorRepository implements IPaseadorRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    public Paseador findByUsuarioId(Long usuarioId) {
+        if (usuarioId == null) {
+            return null;
+        }
+        PaseadorEntity entity = jpaRepository.findByUsuarioId(usuarioId.longValue());
+        return entity != null ? mapper.toDomain(entity) : null;
+    }
+
+    @Override
     public Paseador findByUuid(String uuid) {
         if (uuid == null || uuid.trim().isEmpty()) {
             return null;
@@ -40,7 +46,6 @@ public class PaseadorRepository implements IPaseadorRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public Paseador findByNumeroDocumento(String numeroDocumento) {
         if (numeroDocumento == null || numeroDocumento.trim().isEmpty()) {
             return null;
@@ -50,7 +55,6 @@ public class PaseadorRepository implements IPaseadorRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<Paseador> findAllByDistritoCoberturaId(Integer distritoId) {
         if (distritoId == null) {
             return List.of();
@@ -60,7 +64,6 @@ public class PaseadorRepository implements IPaseadorRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<Paseador> findAllByEstadoVerificacionId(Integer estadoVerificacionId) {
         if (estadoVerificacionId == null) {
             return List.of();
@@ -70,18 +73,13 @@ public class PaseadorRepository implements IPaseadorRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<Paseador> findAllByEstado(Integer estado) {
         List<PaseadorEntity> entities = jpaRepository.findByEstado(estado);
         return mapper.toDomainList(entities);
     }
 
     @Override
-    @Transactional
     public Paseador save(Paseador paseador) {
-        if (paseador.getId() == null && paseador.getUsuario() != null) {
-            paseador.setId(paseador.getUsuario().getId());
-        }
         PaseadorEntity entity = mapper.toEntity(paseador);
         PaseadorEntity savedEntity = jpaRepository.save(entity);
         return mapper.toDomain(savedEntity);

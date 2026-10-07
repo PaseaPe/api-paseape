@@ -2,7 +2,6 @@ package com.paseape.apipaseape.infrastructure.repository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.paseape.apipaseape.application.repository.IUsuarioEstadoRepository;
 import com.paseape.apipaseape.domain.entity.UsuarioEstado;
@@ -20,7 +19,6 @@ public class UsuarioEstadoRepository implements IUsuarioEstadoRepository {
     private final IUsuarioEstadoDboMapper mapper;
 
     @Override
-    @Transactional(readOnly = true)
     public UsuarioEstado findById(Integer id) {
         if (id == null) {
             return null;
@@ -30,7 +28,6 @@ public class UsuarioEstadoRepository implements IUsuarioEstadoRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public UsuarioEstado findByUuid(String uuid) {
         if (uuid == null || uuid.trim().isEmpty()) {
             return null;
@@ -40,7 +37,6 @@ public class UsuarioEstadoRepository implements IUsuarioEstadoRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public UsuarioEstado findByDescripcion(String descripcion) {
         if (descripcion == null || descripcion.trim().isEmpty()) {
             return null;
@@ -50,14 +46,12 @@ public class UsuarioEstadoRepository implements IUsuarioEstadoRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<UsuarioEstado> findAllByEstado(Integer estado) {
         List<UsuarioEstadoEntity> entities = jpaRepository.findByEstado(estado);
         return mapper.toDomainList(entities);
     }
 
     @Override
-    @Transactional
     public UsuarioEstado save(UsuarioEstado usuarioEstado) {
         UsuarioEstadoEntity entity = mapper.toEntity(usuarioEstado);
         UsuarioEstadoEntity savedEntity = jpaRepository.save(entity);

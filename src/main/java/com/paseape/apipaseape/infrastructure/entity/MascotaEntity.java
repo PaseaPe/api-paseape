@@ -62,7 +62,7 @@ public class MascotaEntity extends Auditable {
     @JoinColumn(name = "tipo_nivel_energia_id", nullable = false)
     private TipoNivelEnergiaEntity tipoNivelEnergia;
 
-    @Column(name = "edad_años")
+    @Column(name = "edad_anos")
     private Integer edadAnos;
 
     @Column(name = "edad_meses")
