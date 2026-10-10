@@ -9,6 +9,9 @@ import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.annotation.JsonNaming;
 
 import java.time.LocalDateTime;
+import java.util.List;
+
+import com.paseape.apipaseape.infrastructure.dto.response.MascotaResDto;
 
 @Getter
 @Setter
@@ -32,4 +35,7 @@ public class UsuarioAdminResDto {
     private String usuarioEstadoDescripcion;
     private Integer estado;
     private LocalDateTime creadoEl;
+
+    // Mascotas (solo se incluyen cuando el usuario es CLIENTE)
+    private List<MascotaResDto> mascotas;
 }

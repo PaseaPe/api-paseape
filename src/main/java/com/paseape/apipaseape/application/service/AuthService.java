@@ -335,7 +335,7 @@ public class AuthService {
     }
 
     private Cliente actualizarCliente(Usuario usuario, ActualizarPerfilReqDto reqDto) throws BadRequestException {
-        Cliente cliente = clienteRepository.findById(usuario.getId());
+        Cliente cliente = clienteRepository.findByUsuarioId(usuario.getId());
         if (cliente == null) {
             throw new BadRequestException("El perfil de cliente no existe.");
         }
@@ -360,7 +360,7 @@ public class AuthService {
     }
 
     private Paseador actualizarPaseador(Usuario usuario, ActualizarPerfilReqDto reqDto) throws BadRequestException {
-        Paseador paseador = paseadorRepository.findById(usuario.getId());
+        Paseador paseador = paseadorRepository.findByUsuarioId(usuario.getId());
         if (paseador == null) {
             throw new BadRequestException("El perfil de paseador no existe.");
         }

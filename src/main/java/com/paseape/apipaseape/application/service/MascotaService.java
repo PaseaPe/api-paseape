@@ -48,7 +48,7 @@ public class MascotaService {
 
     @Transactional(readOnly = true)
     public Cliente obtenerClientePorUsuarioId(Long userId) {
-        return clienteRepository.findById(userId);
+        return clienteRepository.findByUsuarioId(userId);
     }
 
     @Transactional(rollbackFor = Exception.class)
