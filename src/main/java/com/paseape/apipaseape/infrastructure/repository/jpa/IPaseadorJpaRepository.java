@@ -1,6 +1,8 @@
 package com.paseape.apipaseape.infrastructure.repository.jpa;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.paseape.apipaseape.infrastructure.entity.PaseadorEntity;
@@ -18,7 +20,11 @@ public interface IPaseadorJpaRepository extends JpaRepository<PaseadorEntity, Lo
 
     PaseadorEntity findByNumeroDocumento(String numeroDocumento);
 
-    List<PaseadorEntity> findByDistritoCoberturaId(Integer distritoId);
+    @Query("SELECT p FROM PaseadorEntity p WHERE (:distritoId IS NULL OR p.distritoCobertura.id = :distritoId) AND p.estadoVerificacion.id = :estadoVerificacionId")
+    List<PaseadorEntity> findByDistritoCoberturaIdAndEstadoVerificacionId(
+            @Param("distritoId") Integer distritoId,
+            @Param("estadoVerificacionId") Integer estadoVerificacionId
+    );
 
     List<PaseadorEntity> findByEstadoVerificacionId(Integer estadoVerificacionId);
 

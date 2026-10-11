@@ -7,6 +7,8 @@ import org.mapstruct.MappingConstants;
 import com.paseape.apipaseape.domain.entity.Paseador;
 import com.paseape.apipaseape.infrastructure.dto.response.PaseadorResDto;
 
+import java.util.List;
+
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface IPaseadorDtoMapper {
 
@@ -21,4 +23,6 @@ public interface IPaseadorDtoMapper {
     @Mapping(target = "estadoVerificacionId", source = "estadoVerificacion.id")
     @Mapping(target = "estadoVerificacionDescripcion", source = "estadoVerificacion.descripcion")
     PaseadorResDto toResDto(Paseador domain);
+
+    List<PaseadorResDto> toResDtoList(List<Paseador> domainList);
 }

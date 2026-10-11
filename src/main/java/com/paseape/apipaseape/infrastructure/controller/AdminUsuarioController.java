@@ -196,7 +196,7 @@ public class AdminUsuarioController extends BaseController {
         }
     }
 
-    @GetMapping("/paseadores/{uuid}")
+    @GetMapping("/paseador/{uuid}")
     public ResponseEntity<ResponseDto<PaseadorAdminResDto>> obtenerPaseador(Principal principal, @PathVariable String uuid) {
         var response = new ResponseDto<PaseadorAdminResDto>();
         try {

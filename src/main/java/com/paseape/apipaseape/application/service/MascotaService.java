@@ -164,4 +164,28 @@ public class MascotaService {
         Mascota mascotaActualizada = mascotaRepository.save(mascota);
         return mascotaDtoMapper.toResDto(mascotaActualizada);
     }
+
+    @Transactional(readOnly = true)
+    public List<MascotaResDto> listarMascotasPorUsuario(String uuid) throws BadRequestException {
+        Usuario usuario = usuarioRepository.findByUuid(uuid);
+        if (usuario == null){
+            throw new BadRequestException("Usuario no encontrado");
+        }
+        Cliente cliente = clienteRepository.findByUsuarioId(usuario.getId());
+        if (cliente == null){
+            throw new BadRequestException("Cliente no encontrado");
+        }
+
+        List<Mascota> mascotas = mascotaRepository.findAllByClienteIdAndEstado(cliente.getId(),1);
+        return mascotaDtoMapper.toResDtoList(mascotas);
+    }
+
+    @Transactional(readOnly = true)
+    public MascotaResDto obtenerMascotaPorUuid(String uuid) throws BadRequestException {
+        Mascota mascota = mascotaRepository.findByUuid(uuid);
+        if (mascota == null){
+            throw new BadRequestException("Mascota no encontrada");
+        }
+        return mascotaDtoMapper.toResDto(mascota);
+    }
 }

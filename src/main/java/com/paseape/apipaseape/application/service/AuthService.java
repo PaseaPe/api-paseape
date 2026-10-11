@@ -69,6 +69,7 @@ public class AuthService {
 
         return AuthResDto.builder()
                 .id(usuario.getId())
+                .uuid(usuario.getUuid())
                 .email(usuario.getCorreo())
                 .fullName(construirNombreCompleto(usuario.getNombres(), usuario.getApellidos()))
                 .pictureUrl(usuario.getFotoPerfilUrl())
@@ -98,6 +99,7 @@ public class AuthService {
 
         return AuthResDto.builder()
                 .id(usuario.getId())
+                .uuid(usuario.getUuid())
                 .email(usuario.getCorreo())
                 .fullName(construirNombreCompleto(usuario.getNombres(), usuario.getApellidos()))
                 .pictureUrl(usuario.getFotoPerfilUrl())
@@ -167,6 +169,7 @@ public class AuthService {
 
         return AuthResDto.builder()
                 .id(savedUser.getId())
+                .uuid(savedUser.getUuid())
                 .email(savedUser.getCorreo())
                 .fullName(construirNombreCompleto(savedUser.getNombres(), savedUser.getApellidos()))
                 .pictureUrl(savedUser.getFotoPerfilUrl())
@@ -207,6 +210,7 @@ public class AuthService {
 
         return AuthResDto.builder()
                 .id(savedUser.getId())
+                .uuid(savedUser.getUuid())
                 .email(savedUser.getCorreo())
                 .fullName(construirNombreCompleto(savedUser.getNombres(), savedUser.getApellidos()))
                 .pictureUrl(savedUser.getFotoPerfilUrl())
