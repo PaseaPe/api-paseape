@@ -105,6 +105,7 @@ public class AuthService {
                 .pictureUrl(usuario.getFotoPerfilUrl())
                 .role(role)
                 .token(token)
+                .userTypeId(usuario.getTipoUsuario().getId())
                 .build();
     }
 
