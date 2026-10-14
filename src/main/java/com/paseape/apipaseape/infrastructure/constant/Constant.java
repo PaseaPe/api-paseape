@@ -166,4 +166,10 @@ public class Constant {
     public static final int ESTADO_LOGICO_INACTIVO = 0;
 
     public static final String MENSAJE_RECUPERACION_GENERICO = "Si el correo se encuentra registrado en PaseaPe, recibirás un mensaje con las instrucciones.";
+
+    // DIGITAL DOCUMENT TYPE
+    public static final int ID_DOC_FOTO_PERFIL = 1;
+    public static final int ID_DOC_FOTO_MASCOTA = 2;
+    public static final int ID_DOC_ANTECEDENTE_POLICIAL = 3;
+    public static final int ID_DOC_DOCUMENTO_IDENTIDAD = 4;
 }

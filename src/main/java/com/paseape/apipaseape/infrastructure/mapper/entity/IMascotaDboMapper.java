@@ -15,14 +15,12 @@ import java.util.List;
                 ITipoRazaDboMapper.class,
                 ITipoGeneroMascotaDboMapper.class,
                 ITipoTamanoMascotaDboMapper.class,
-                ITipoNivelEnergiaDboMapper.class
+                ITipoNivelEnergiaDboMapper.class,
+                IDigitalDocumentDboMapper.class
         }
 )
 public interface IMascotaDboMapper {
-
     Mascota toDomain(MascotaEntity entity);
-
     MascotaEntity toEntity(Mascota domain);
-
     List<Mascota> toDomainList(List<MascotaEntity> entities);
 }
