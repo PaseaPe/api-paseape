@@ -27,7 +27,7 @@ public class AdministradorEntity extends Auditable {
     private String uuid;
 
     @ManyToOne
-    @JoinColumn(name = "usuario_id", insertable = false, updatable = false)
+    @JoinColumn(name = "usuario_id", nullable = false)
     private UsuarioEntity usuario;
 
     @Column(name = "codigo_empleado", nullable = false, length = 50, unique = true)

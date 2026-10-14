@@ -18,5 +18,6 @@ public class AuthResDto {
     private String fullName;
     private String pictureUrl;
     private String role;
+    private Integer userTypeId;
     private String token;
 }

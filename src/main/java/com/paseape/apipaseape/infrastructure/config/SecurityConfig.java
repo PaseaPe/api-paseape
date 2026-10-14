@@ -37,7 +37,7 @@ public class SecurityConfig {
                         .requestMatchers("/health").permitAll()
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/application-parameters/**").permitAll()
-                        .requestMatchers("/admin/**").hasRole("ADMINISTRADOR")
+                        .requestMatchers("/admin/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

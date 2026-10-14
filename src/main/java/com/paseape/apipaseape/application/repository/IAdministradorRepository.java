@@ -18,4 +18,7 @@ public interface IAdministradorRepository {
     List<Administrador> findAllByEstado(Integer estado);
 
     Administrador save(Administrador administrador);
+
+    Administrador findUltimoRegistrado();
+
 }

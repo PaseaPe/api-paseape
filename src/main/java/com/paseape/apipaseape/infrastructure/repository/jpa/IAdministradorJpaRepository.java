@@ -20,4 +20,6 @@ public interface IAdministradorJpaRepository extends JpaRepository<Administrador
     AdministradorEntity findByCodigoEmpleado(String codigoEmpleado);
 
     List<AdministradorEntity> findByEstado(Integer estado);
+
+    AdministradorEntity findFirstByOrderByIdDesc();
 }

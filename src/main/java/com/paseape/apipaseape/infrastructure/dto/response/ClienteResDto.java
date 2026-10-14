@@ -8,6 +8,8 @@ import lombok.Setter;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.annotation.JsonNaming;
 
+import java.util.List;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -31,4 +33,6 @@ public class ClienteResDto {
     private String contactoEmergenciaTelefono;
     private String notasAdicionales;
     private Integer estado;
+
+    private List<MascotaResDto> mascotas;
 }

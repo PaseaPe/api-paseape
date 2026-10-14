@@ -46,6 +46,19 @@ public class AdministradorRepository implements IAdministradorRepository {
     }
 
     @Override
+    public Administrador save(Administrador administrador) {
+        AdministradorEntity entity = mapper.toEntity(administrador);
+        AdministradorEntity savedEntity = jpaRepository.save(entity);
+        return mapper.toDomain(savedEntity);
+    }
+
+    @Override
+    public Administrador findUltimoRegistrado() {
+        AdministradorEntity entity = jpaRepository.findFirstByOrderByIdDesc();
+        return entity != null ? mapper.toDomain(entity) : null;
+    }
+
+    @Override
     public Administrador findByCodigoEmpleado(String codigoEmpleado) {
         if (codigoEmpleado == null || codigoEmpleado.trim().isEmpty()) {
             return null;
@@ -58,12 +71,5 @@ public class AdministradorRepository implements IAdministradorRepository {
     public List<Administrador> findAllByEstado(Integer estado) {
         List<AdministradorEntity> entities = jpaRepository.findByEstado(estado);
         return mapper.toDomainList(entities);
-    }
-
-    @Override
-    public Administrador save(Administrador administrador) {
-        AdministradorEntity entity = mapper.toEntity(administrador);
-        AdministradorEntity savedEntity = jpaRepository.save(entity);
-        return mapper.toDomain(savedEntity);
     }
 }
