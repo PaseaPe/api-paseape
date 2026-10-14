@@ -1,5 +1,6 @@
 package com.paseape.apipaseape.infrastructure.repository;
 
+import com.paseape.apipaseape.infrastructure.constant.Constant;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
@@ -56,10 +57,10 @@ public class PaseadorRepository implements IPaseadorRepository {
 
     @Override
     public List<Paseador> findAllByDistritoCoberturaId(Integer distritoId) {
-        if (distritoId == null) {
-            return List.of();
-        }
-        List<PaseadorEntity> entities = jpaRepository.findByDistritoCoberturaId(distritoId);
+        List<PaseadorEntity> entities = jpaRepository.findByDistritoCoberturaIdAndEstadoVerificacionId(
+                distritoId,
+                Constant.ID_APROBADO
+        );
         return mapper.toDomainList(entities);
     }
 

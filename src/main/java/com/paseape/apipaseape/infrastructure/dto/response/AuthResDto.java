@@ -13,6 +13,7 @@ import lombok.Setter;
 @Builder
 public class AuthResDto {
     private Long id;
+    private String uuid;
     private String email;
     private String fullName;
     private String pictureUrl;
