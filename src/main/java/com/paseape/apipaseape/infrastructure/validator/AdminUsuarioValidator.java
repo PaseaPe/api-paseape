@@ -152,7 +152,8 @@ public class AdminUsuarioValidator {
         if (estadoVerificacionId != ID_EN_REVISION
                 && estadoVerificacionId != ID_APROBADO
                 && estadoVerificacionId != ID_RECHAZADO
-                && estadoVerificacionId != ID_OBSERVADO) {
+                && estadoVerificacionId != ID_OBSERVADO
+                && estadoVerificacionId != ID_PENDIENTE) {
             return buildError("Estado de verificacion no permitido. Valores validos: 2 (EN_REVISION), 3 (APROBADO), 4 (RECHAZADO), 5 (OBSERVADO).");
         }
 
