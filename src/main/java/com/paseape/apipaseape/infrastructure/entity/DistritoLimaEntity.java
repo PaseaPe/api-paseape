@@ -15,7 +15,6 @@ import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "distritos_lima")
-@SQLRestriction("estado = 1")
 @Getter
 @Setter
 @NoArgsConstructor

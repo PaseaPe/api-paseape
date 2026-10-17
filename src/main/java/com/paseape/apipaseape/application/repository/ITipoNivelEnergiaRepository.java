@@ -15,4 +15,6 @@ public interface ITipoNivelEnergiaRepository {
     List<TipoNivelEnergia> findAllByEstado(Integer estado);
 
     TipoNivelEnergia save(TipoNivelEnergia tipoNivelEnergia);
+
+    List<TipoNivelEnergia> findAll();
 }

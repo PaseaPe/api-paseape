@@ -15,7 +15,6 @@ import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "tipo_genero_mascota")
-@SQLRestriction("estado = 1")
 @Getter
 @Setter
 @NoArgsConstructor

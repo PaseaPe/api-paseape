@@ -52,6 +52,12 @@ public class TipoNivelEnergiaRepository implements ITipoNivelEnergiaRepository {
     }
 
     @Override
+    public List<TipoNivelEnergia> findAll() {
+        List<TipoNivelEnergiaEntity> entities = jpaRepository.findAll();
+        return mapper.toDomainList(entities);
+    }
+
+    @Override
     public TipoNivelEnergia save(TipoNivelEnergia tipoNivelEnergia) {
         TipoNivelEnergiaEntity entity = mapper.toEntity(tipoNivelEnergia);
         TipoNivelEnergiaEntity savedEntity = jpaRepository.save(entity);

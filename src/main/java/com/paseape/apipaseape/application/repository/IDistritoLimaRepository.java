@@ -17,4 +17,6 @@ public interface IDistritoLimaRepository {
     List<DistritoLima> findAllByEstado(Integer estado);
 
     DistritoLima save(DistritoLima distritoLima);
+
+    List<DistritoLima> findAll();
 }

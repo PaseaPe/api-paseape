@@ -61,6 +61,12 @@ public class DistritoLimaRepository implements IDistritoLimaRepository {
     }
 
     @Override
+    public List<DistritoLima> findAll() {
+        List<DistritoLimaEntity> entities = jpaRepository.findAll();
+        return mapper.toDomainList(entities);
+    }
+
+    @Override
     public DistritoLima save(DistritoLima distritoLima) {
         DistritoLimaEntity entity = mapper.toEntity(distritoLima);
         DistritoLimaEntity savedEntity = jpaRepository.save(entity);

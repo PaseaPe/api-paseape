@@ -19,4 +19,6 @@ public interface ITipoRazaRepository {
     List<TipoRaza> findAllByEstado(Integer estado);
 
     TipoRaza save(TipoRaza tipoRaza);
+
+    List<TipoRaza> findAll();
 }
