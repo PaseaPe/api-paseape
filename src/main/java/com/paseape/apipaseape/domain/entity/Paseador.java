@@ -29,6 +29,7 @@ public class Paseador {
     private PaseadorEstadoVerificacion estadoVerificacion;
     private Integer paseosCompletados;
     private BigDecimal calificacionPromedio;
+    private Integer maxMascotasPredeterminado;
     private Integer estado;
     private LocalDateTime creadoEl;
     private LocalDateTime actualizadoEl;
