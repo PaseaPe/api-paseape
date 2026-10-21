@@ -9,7 +9,7 @@ Este documento recopila el contexto técnico, la arquitectura de software, los e
 | Componente | Tecnología / Versión | Detalle de Configuración |
 | :--- | :--- | :--- |
 | **Lenguaje** | Java 21 LTS | Compatible con características modernas de lenguaje, salvo restricciones explícitas del proyecto. |
-| **Framework Base** | Spring Boot 3.x | Arquitectura modular basada en Spring Data JPA, Spring Security y Spring Web. |
+| **Framework Base** | Spring Boot 4.1.1 | Arquitectura modular basada en Spring Data JPA, Spring Security y Spring Web. |
 | **Gestor de Construcción** | Gradle | Compilación mediante `./gradlew clean bootJar -x jar`. |
 | **Persistencia** | Spring Data JPA / Hibernate 6 | Mapeo objeto-relacional optimizado, consultas JPQL y nativas según caso. |
 | **Motor de Base de Datos** | MySQL 8 | Aiven Cloud Managed en producción; XAMPP/Docker en desarrollo local. |
@@ -132,7 +132,7 @@ Toda petición HTTP responde con la envoltura estándar:
 - Mantener mappings explícitos y desacoplados para evitar fugas de infraestructura hacia el dominio.
 
 ### Regla 11: Identificación Pública Estricta por UUID (Ofuscación de Claves Primarias)
-- **DTOs de Respuesta (`*ResDto`):** Toda entidad expuesta hacia el frontend debe incluir obligatoriamente su campo `uuid` (ej. `uuid`, `mascota_uuid`, `paseador_uuid`, `solicitud_uuid`). Queda **prohibido exponer el `id` numérico autoincremental** de la base de datos en los contratos públicos.
+- **DTOs de Respuesta (`*ResDto`):** Toda entidad expuesta hacia el frontend debe incluir obligatoriamente su campo `uuid` (ej. `uuid`, `mascota_uuid`, `paseador_uuid`, `solicitud_uuid`). Queda **prohibido exponer el `id` numérico autoincremental** de la base de datos en los contratos públicos, a excepción de las tablas catalogo lookup table.
 - **DTOs de Entrada (`*ReqDto`) y Parámetros:** Cada vez que el frontend consulte el detalle de una entidad o solicite actualizar algún campo, deberá enviar el `uuid` correspondiente.
 - **Repositorios y Servicios:** Las búsquedas de negocio externas se realizan exclusivamente con `findByUuid(String uuid)`. Si la entidad no existe, el servicio lanza de inmediato `BadRequestException`. Los `id` autoincrementales numéricos de MySQL quedan estrictamente reservados para el motor de base de datos y relaciones internas de clave foránea.
 - **Validadores:** Cada validador comprueba que el `uuid` cumpla con el formato válido canónico de 36 caracteres y no sea nulo ni vacío.
