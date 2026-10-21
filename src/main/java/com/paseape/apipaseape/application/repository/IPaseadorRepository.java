@@ -16,6 +16,8 @@ public interface IPaseadorRepository {
 
     List<Paseador> findAllByDistritoCoberturaId(Integer distritoId);
 
+    List<Paseador> findAllByDistritoCoberturaIds(List<Integer> distritoIds);
+
     List<Paseador> findAllByEstadoVerificacionId(Integer estadoVerificacionId);
 
     List<Paseador> findAllByEstado(Integer estado);

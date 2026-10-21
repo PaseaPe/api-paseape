@@ -14,4 +14,7 @@ public interface IBloqueHorarioJpaRepository extends JpaRepository<BloqueHorario
     BloqueHorarioEntity findByCodigo(String codigo);
 
     List<BloqueHorarioEntity> findAllByEstado(Boolean estado);
+
+    List<BloqueHorarioEntity> findAllByEstadoOrderByOrdenAsc(Boolean estado);
+
 }

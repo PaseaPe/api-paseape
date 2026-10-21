@@ -59,11 +59,29 @@ public class DisponibilidadPaseadorRepository implements IDisponibilidadPaseador
     }
 
     @Override
+    public DisponibilidadPaseador findByPaseadorIdAndDiaSemanaIdAndBloqueHorarioIdIncludingInactive(Long paseadorId, Integer diaSemanaId, Integer bloqueHorarioId) {
+        if (paseadorId == null || diaSemanaId == null || bloqueHorarioId == null) {
+            return null;
+        }
+        DisponibilidadPaseadorEntity entity = jpaRepository.findByPaseadorIdAndDiaSemanaIdAndBloqueHorarioIdIncludingInactive(paseadorId, diaSemanaId, bloqueHorarioId);
+        return entity != null ? mapper.toDomain(entity) : null;
+    }
+
+    @Override
     public List<DisponibilidadPaseador> findAllByPaseadorId(Long paseadorId) {
         if (paseadorId == null) {
             return List.of();
         }
         List<DisponibilidadPaseadorEntity> entities = jpaRepository.findAllByPaseadorId(paseadorId);
+        return mapper.toDomainList(entities);
+    }
+
+    @Override
+    public List<DisponibilidadPaseador> findAllByPaseadorIdIncludingInactive(Long paseadorId) {
+        if (paseadorId == null) {
+            return List.of();
+        }
+        List<DisponibilidadPaseadorEntity> entities = jpaRepository.findAllByPaseadorIdIncludingInactive(paseadorId);
         return mapper.toDomainList(entities);
     }
 
@@ -76,3 +94,4 @@ public class DisponibilidadPaseadorRepository implements IDisponibilidadPaseador
         return mapper.toDomainList(entities);
     }
 }
+

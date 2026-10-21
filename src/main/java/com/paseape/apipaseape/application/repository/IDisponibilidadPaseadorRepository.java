@@ -14,7 +14,12 @@ public interface IDisponibilidadPaseadorRepository {
 
     DisponibilidadPaseador findByPaseadorIdAndDiaSemanaIdAndBloqueHorarioId(Long paseadorId, Integer diaSemanaId, Integer bloqueHorarioId);
 
+    DisponibilidadPaseador findByPaseadorIdAndDiaSemanaIdAndBloqueHorarioIdIncludingInactive(Long paseadorId, Integer diaSemanaId, Integer bloqueHorarioId);
+
     List<DisponibilidadPaseador> findAllByPaseadorId(Long paseadorId);
+
+    List<DisponibilidadPaseador> findAllByPaseadorIdIncludingInactive(Long paseadorId);
 
     List<DisponibilidadPaseador> findAllByPaseadorIdAndDiaSemanaId(Long paseadorId, Integer diaSemanaId);
 }
+

@@ -10,7 +10,9 @@ import com.paseape.apipaseape.infrastructure.mapper.entity.ISolicitudPaseoDboMap
 import com.paseape.apipaseape.infrastructure.repository.jpa.ISolicitudPaseoJpaRepository;
 
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Repository
 @RequiredArgsConstructor
@@ -81,5 +83,33 @@ public class SolicitudPaseoRepository implements ISolicitudPaseoRepository {
         }
         Long count = jpaRepository.countMascotasOcupadas(paseadorId, fechaProgramada, bloqueHorarioId, estadosIds);
         return count != null ? count.intValue() : 0;
+    }
+
+    @Override
+    public Map<Integer, Integer> countMascotasOcupadasAgrupadoPorBloque(Long paseadorId, LocalDate fechaProgramada, List<Integer> estadosIds) {
+        if (paseadorId == null || fechaProgramada == null || estadosIds == null || estadosIds.isEmpty()) {
+            return Map.of();
+        }
+        List<Object[]> rows = jpaRepository.countMascotasOcupadasAgrupadoPorBloque(paseadorId, fechaProgramada, estadosIds);
+        Map<Integer, Integer> result = new HashMap<>();
+        if (rows != null) {
+            for (Object[] row : rows) {
+                if (row != null && row.length >= 2 && row[0] != null && row[1] != null) {
+                    Integer bloqueId = ((Number) row[0]).intValue();
+                    Integer count = ((Number) row[1]).intValue();
+                    result.put(bloqueId, count);
+                }
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public List<SolicitudPaseo> findFutureBookingsByPaseadorAndBloque(Long paseadorId, Integer bloqueHorarioId, LocalDate fechaHoy, List<Integer> estadosIds) {
+        if (paseadorId == null || bloqueHorarioId == null || fechaHoy == null || estadosIds == null || estadosIds.isEmpty()) {
+            return List.of();
+        }
+        List<SolicitudPaseoEntity> entities = jpaRepository.findFutureBookingsByPaseadorAndBloque(paseadorId, bloqueHorarioId, fechaHoy, estadosIds);
+        return mapper.toDomainList(entities);
     }
 }

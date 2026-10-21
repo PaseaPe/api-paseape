@@ -33,4 +33,27 @@ public interface ISolicitudPaseoJpaRepository extends JpaRepository<SolicitudPas
             @Param("bloqueHorarioId") Integer bloqueHorarioId,
             @Param("estadosIds") List<Integer> estadosIds
     );
+
+    @Query("SELECT spm.solicitudPaseo.bloqueHorario.id, COUNT(spm) FROM SolicitudPaseoMascotaEntity spm " +
+            "WHERE spm.solicitudPaseo.paseador.id = :paseadorId " +
+            "AND spm.solicitudPaseo.fechaProgramada = :fechaProgramada " +
+            "AND spm.solicitudPaseo.solicitudPaseoEstado.id IN :estadosIds " +
+            "GROUP BY spm.solicitudPaseo.bloqueHorario.id")
+    List<Object[]> countMascotasOcupadasAgrupadoPorBloque(
+            @Param("paseadorId") Long paseadorId,
+            @Param("fechaProgramada") LocalDate fechaProgramada,
+            @Param("estadosIds") List<Integer> estadosIds
+    );
+
+    @Query("SELECT sp FROM SolicitudPaseoEntity sp " +
+            "WHERE sp.paseador.id = :paseadorId " +
+            "AND sp.bloqueHorario.id = :bloqueHorarioId " +
+            "AND sp.fechaProgramada >= :fechaHoy " +
+            "AND sp.solicitudPaseoEstado.id IN :estadosIds")
+    List<SolicitudPaseoEntity> findFutureBookingsByPaseadorAndBloque(
+            @Param("paseadorId") Long paseadorId,
+            @Param("bloqueHorarioId") Integer bloqueHorarioId,
+            @Param("fechaHoy") LocalDate fechaHoy,
+            @Param("estadosIds") List<Integer> estadosIds
+    );
 }

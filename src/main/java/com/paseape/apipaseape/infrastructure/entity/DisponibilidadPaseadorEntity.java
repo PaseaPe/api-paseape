@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -33,21 +34,27 @@ public class DisponibilidadPaseadorEntity extends Auditable {
     @Column(name = "uuid", nullable = false, length = 36, unique = true)
     private String uuid;
 
-    @ManyToOne
-    @JoinColumn(name = "paseador_id", nullable = false)
-    private PaseadorEntity paseador;
+    @Column(name = "paseador_id", nullable = false)
+    private Long paseadorId;
 
-    @ManyToOne
-    @JoinColumn(name = "dia_semana_id", nullable = false)
-    private DiaSemanaEntity diaSemana;
+    @Column(name = "dia_semana_id", nullable = false)
+    private Integer diaSemanaId;
 
-    @ManyToOne
-    @JoinColumn(name = "bloque_horario_id", nullable = false)
-    private BloqueHorarioEntity bloqueHorario;
+    @Column(name = "bloque_horario_id", nullable = false)
+    private Integer bloqueHorarioId;
 
     @Column(name = "max_mascotas", nullable = false)
     private Integer maxMascotas;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "dia_semana_id", insertable = false, updatable = false)
+    private DiaSemanaEntity diaSemana;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "bloque_horario_id", insertable = false, updatable = false)
+    private BloqueHorarioEntity bloqueHorario;
+
     @Column(name = "estado", nullable = false)
-    private Integer estado;
+    private Boolean estado;
 }
+

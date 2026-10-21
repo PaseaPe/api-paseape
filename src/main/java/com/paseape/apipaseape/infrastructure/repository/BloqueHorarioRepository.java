@@ -47,7 +47,7 @@ public class BloqueHorarioRepository implements IBloqueHorarioRepository {
         if (estado == null) {
             return List.of();
         }
-        List<BloqueHorarioEntity> entities = jpaRepository.findAllByEstado(estado);
+        List<BloqueHorarioEntity> entities = jpaRepository.findAllByEstadoOrderByOrdenAsc(estado);
         return mapper.toDomainList(entities);
     }
 }

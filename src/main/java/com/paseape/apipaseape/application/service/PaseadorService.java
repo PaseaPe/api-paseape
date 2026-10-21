@@ -47,22 +47,63 @@ public class PaseadorService {
     }
 
     @Transactional(readOnly = true)
-    public UsuarioResDto obtenerPaseador(String uuid) throws BadRequestException {
-        Usuario usuario = usuarioRepository.findByUuid(uuid);
-        if (usuario == null){
-            throw new BadRequestException("No se encontro el usuario");
-        };
-        Paseador paseador = paseadorRepository.findByUsuarioId(usuario.getId());
-        if (paseador == null){
-            throw new BadRequestException("No se encontro el paseador");
-        };
+    public Paseador obtenerEntidadPaseador(String uuid) throws BadRequestException {
+        if (uuid == null || uuid.trim().isEmpty()) {
+            throw new BadRequestException("El identificador del paseador es obligatorio.");
+        }
+        Usuario usuario = usuarioRepository.findByUuid(uuid.trim());
+        Paseador paseador = null;
+        if (usuario != null) {
+            paseador = paseadorRepository.findByUsuarioId(usuario.getId());
+        } else {
+            paseador = paseadorRepository.findByUuid(uuid.trim());
+        }
+        if (paseador == null) {
+            throw new BadRequestException("No se encontró el paseador especificado.");
+        }
+        return paseador;
+    }
 
-        return usuarioDtoMapper.toResDto(usuario,null,paseador, null,paseadorDtoMapper);
+    @Transactional(readOnly = true)
+    public UsuarioResDto obtenerPaseador(String uuid) throws BadRequestException {
+        Paseador paseador = obtenerEntidadPaseador(uuid);
+        Usuario usuario = paseador.getUsuario() != null && paseador.getUsuario().getId() != null
+                ? usuarioRepository.findById(paseador.getUsuario().getId())
+                : null;
+        if (usuario == null) {
+            throw new BadRequestException("No se encontró el usuario del paseador.");
+        }
+        return usuarioDtoMapper.toResDto(usuario, null, paseador, null, paseadorDtoMapper);
+    }
+
+    @Transactional(readOnly = true)
+    public List<PaseadorResDto> obtenerPaseadores(List<Integer> distritos) {
+        List<Paseador> paseadores = paseadorRepository.findAllByDistritoCoberturaIds(distritos);
+        return paseadorDtoMapper.toResDtoList(paseadores);
     }
 
     @Transactional(readOnly = true)
     public List<PaseadorResDto> obtenerPaseadores(Integer distrito) {
-        List<Paseador> paseadores = paseadorRepository.findAllByDistritoCoberturaId(distrito);
-        return paseadorDtoMapper.toResDtoList(paseadores);
+        List<Integer> distritos = distrito != null ? List.of(distrito) : List.of();
+        return obtenerPaseadores(distritos);
+    }
+
+    @Transactional(readOnly = true)
+    public Paseador obtenerPerfilPorUsuarioId(Long usuarioId) throws BadRequestException {
+        if (usuarioId == null) {
+            throw new BadRequestException("El identificador de usuario es obligatorio.");
+        }
+        Paseador paseador = paseadorRepository.findByUsuarioId(usuarioId);
+        if (paseador == null) {
+            throw new BadRequestException("El usuario no cuenta con un perfil de paseador registrado.");
+        }
+        return paseador;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Paseador actualizarCapacidadPredeterminada(Long usuarioId, Integer nuevaCapacidadBase) throws BadRequestException {
+        Paseador paseador = obtenerPerfilPorUsuarioId(usuarioId);
+        paseador.setMaxMascotasPredeterminado(nuevaCapacidadBase);
+        return paseadorRepository.save(paseador);
     }
 }

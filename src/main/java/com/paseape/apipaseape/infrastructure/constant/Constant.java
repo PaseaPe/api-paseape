@@ -166,4 +166,13 @@ public class Constant {
     public static final int ESTADO_LOGICO_INACTIVO = 0;
 
     public static final String MENSAJE_RECUPERACION_GENERICO = "Si el correo se encuentra registrado en PaseaPe, recibirás un mensaje con las instrucciones.";
+
+    // DISPONIBILIDAD PASEADOR (HU13)
+    public static final String ACCION_BLOQUE_GUARDAR_CUPO = "GUARDAR_CUPO";
+    public static final String ACCION_BLOQUE_REESTABLECER = "REESTABLECER_PREDETERMINADO";
+    public static final String ACCION_BLOQUE_CANCELAR = "CANCELAR";
+    public static final int MIN_MASCOTAS_PERMITIDAS = 1;
+    public static final int MAX_MASCOTAS_PERMITIDAS = 6;
+    public static final int CAPACIDAD_BASE_DEFAULT = 3;
 }
+

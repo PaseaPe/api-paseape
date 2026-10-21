@@ -17,13 +17,15 @@ public class DisponibilidadPaseador {
 
     private Long id;
     private String uuid;
-    private Paseador paseador;
+    private Long paseadorId;
+    private Integer diaSemanaId;
+    private Integer bloqueHorarioId;
     private DiaSemana diaSemana;
     private BloqueHorario bloqueHorario;
     private Integer maxMascotas;
-    private Integer estado;
     private LocalDateTime creadoEl;
     private LocalDateTime actualizadoEl;
     private String creadoPor;
     private String actualizadoPor;
+    private Boolean estado;
 }
