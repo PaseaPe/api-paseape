@@ -41,6 +41,12 @@ public class Constant {
     public static final String DOC_PASAPORTE = "PASAPORTE";
 
     public static final int LONGITUD_DNI = 8;
+    public static final int LONGITUD_CARNET_EXTRANJERIA = 9;
+    public static final int LONGITUD_PASAPORTE = 9;
+
+    public static final String REGEX_DNI = "^[0-9]{8}$";
+    public static final String REGEX_CARNET_EXTRANJERIA = "^[0-9]{9}$";
+    public static final String REGEX_PASAPORTE = "^[A-Z0-9]{9}$";
 
     //PASEADOR ESTADO VERIFICACION
     public static final int ID_PENDIENTE = 1;
@@ -175,4 +181,3 @@ public class Constant {
     public static final int MAX_MASCOTAS_PERMITIDAS = 6;
     public static final int CAPACIDAD_BASE_DEFAULT = 3;
 }
-
