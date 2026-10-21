@@ -47,4 +47,5 @@ public class UsuarioReqDto {
     private String biografia;
     private BigDecimal tarifaHoraPen;
     private Integer distritoCoberturaId;
+    private Integer maxMascotasPredeterminado;
 }
