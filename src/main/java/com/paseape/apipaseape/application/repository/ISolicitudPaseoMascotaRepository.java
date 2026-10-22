@@ -11,4 +11,8 @@ public interface ISolicitudPaseoMascotaRepository {
     List<SolicitudPaseoMascota> saveAll(List<SolicitudPaseoMascota> solicitudesMascotas);
 
     List<SolicitudPaseoMascota> findAllBySolicitudPaseoId(Long solicitudPaseoId);
+
+    List<SolicitudPaseoMascota> findAllBySolicitudPaseoIdWithDetails(Long solicitudPaseoId);
+
+    List<SolicitudPaseoMascota> findAllBySolicitudPaseoIdInWithDetails(List<Long> solicitudPaseoIds);
 }

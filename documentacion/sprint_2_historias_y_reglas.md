@@ -1,6 +1,6 @@
 # Especificaciones y Reglas de Negocio - SPRINT 2 (api-paseape)
 
-Este documento detalla los requerimientos funcionales, el modelo de datos, las reglas de negocio y las Historias de Usuario correspondientes al **SPRINT 2** del backend **api-paseape**.
+Este documento detalla los requerimientos funcionales, el modelo de datos, las reglas de negocio y el avance de las Historias de Usuario correspondientes al **SPRINT 2** del backend **api-paseape**.
 
 ---
 
@@ -8,11 +8,12 @@ Este documento detalla los requerimientos funcionales, el modelo de datos, las r
 
 El Sprint 2 tiene como objetivo habilitar el núcleo operativo y transaccional de la plataforma *PaseaPe*:
 - Gestión de disponibilidad semanal de los paseadores (Completada).
-- Búsqueda y filtrado dinámico de paseadores por ubicación, horario y cupo disponible.
-- Flujo de creación y contratación de paseos: modalidad inmediata ("Tipo Taxi") y modalidad programada para fechas futuras.
+- Búsqueda y filtrado dinámico de paseadores por ubicación, horario y cupo disponible por fecha (Completada).
+- Validación de identidad y documentos oficiales (DNI con RENIEC/ApisPerú condicional por entorno, Carnet de Extranjería y Pasaporte) (Completada).
+- Flujo de creación y contratación de paseos: modalidad inmediata ("Tipo Taxi" - HU15) y modalidad programada para fechas futuras (HU16-HU19).
 - Soporte para paseos con múltiples mascotas (relación N:M).
-- Ciclo de vida completo del servicio de paseo (Aceptar, Rechazar, Iniciar, Finalizar, Cancelar).
-- Sistema de notificaciones internas modulares con soporte para Short Polling y alertas por correo vía Brevo.
+- Ciclo de vida completo del servicio de paseo (Aceptar, Rechazar, Iniciar, Finalizar, Cancelar - HU21).
+- Sistema de notificaciones internas modulares con soporte para Short Polling y alertas por correo vía Brevo (HU22, HU23).
 - **Identificación pública:** Todos los contratos de entrada (`*ReqDto`) y salida (`*ResDto`) emplean exclusivamente `uuid` en lugar de IDs numéricos internos.
 
 ---
@@ -71,50 +72,122 @@ El Sprint 2 tiene como objetivo habilitar el núcleo operativo y transaccional d
 
 ---
 
-## 3. Estado de Avance del Sprint
+## 3. Historias de Usuario Desarrolladas y Estado de Avance
 
-### Módulo Completado: Gestión de Disponibilidad del Paseador (HU13)
-- **Controlador:** `DisponibilidadPaseadorController` (`/paseador/disponibilidad`).
-  - `GET /api-paseape/paseador/disponibilidad`: Obtiene la matriz semanal activa y capacidad base del paseador en sesión.
-  - `PUT /api-paseape/paseador/disponibilidad`: Guardado y sincronización en lote de la cuadrícula completa (`GuardarDisponibilidadReqDto`).
-  - `PATCH /api-paseape/paseador/disponibilidad/bloque`: Modificación unitaria de un bloque horario (`ActualizarBloqueDisponibilidadReqDto`) bajo 3 acciones: `GUARDAR_CUPO`, `REESTABLECER_PREDETERMINADO`, `CANCELAR`.
-  - `PATCH /api-paseape/paseador/disponibilidad/capacidad-base`: Actualiza `max_mascotas_predeterminado` en la entidad del paseador.
-- **Componentes desarrollados:** `DisponibilidadPaseadorService`, `DisponibilidadPaseadorValidator`, entidades de dominio y JPA (`DisponibilidadPaseador`, `DiaSemana`, `BloqueHorario`), mappers MapStruct y DTOs de solicitud/respuesta.
+### A. HU13 – Gestión de la Disponibilidad del Paseador (COMPLETADA)
+* **Objetivo:** Permitir al paseador definir su cuadrícula semanal de atención, capacidad predeterminada y modificar o cancelar bloques específicos.
+* **Cómo se desarrolló:**
+  * **Controlador:** `DisponibilidadPaseadorController` (`/paseador/disponibilidad`).
+  * `GET /api-paseape/paseador/disponibilidad`: Obtiene la disponibilidad activa semanal del paseador en sesión.
+  * `PUT /api-paseape/paseador/disponibilidad`: Sincronización masiva de la matriz semanal (`GuardarDisponibilidadReqDto`).
+  * `PATCH /api-paseape/paseador/disponibilidad/bloque`: Modificación unitaria de un bloque con 3 acciones exclusivas: `GUARDAR_CUPO`, `REESTABLECER_PREDETERMINADO`, `CANCELAR` (validando que no existan reservas futuras activas).
+  * `PATCH /api-paseape/paseador/disponibilidad/capacidad-base`: Actualiza `max_mascotas_predeterminado` en la entidad del paseador.
+  * **Capas construidas:** `DisponibilidadPaseadorService`, `DisponibilidadPaseadorValidator`, `IDisponibilidadPaseadorRepository`, `IDisponibilidadPaseadorJpaRepository`, mappers y DTOs correspondientes.
+* **Cómo funciona:** La disponibilidad semanal funciona como una plantilla recurrente vinculada a `dia_semana_id` y `bloque_horario_id`, definiendo qué días atiende el paseador y cuál es su tope máximo de mascotas por bloque.
+
+---
+
+### B. HU12 – Búsqueda de Paseadores y Disponibilidad Dinámica con Ocupación de Cupos (COMPLETADA)
+* **Objetivo:** Permitir al cliente buscar paseadores cercanos en uno o varios distritos y, al consultar el perfil de un paseador, ver exactamente qué bloques están ocupados o agotados para una fecha específica sin esperar al final del flujo para recibir un error.
+* **Cómo se desarrolló:**
+  1. **Refactorización de `GET /api-paseape/paseadores` (`obtenerPaseadores`):**
+     * Admite búsqueda por múltiples distritos (`@RequestParam List<Integer> distrito_ids`).
+     * Soporte de fallback automático: Si el frontend no envía distritos, el backend inspecciona el usuario autenticado (`Principal`), consulta su perfil de `Cliente` y filtra automáticamente por su distrito por defecto.
+     * Filtro estricto de seguridad: Solo lista paseadores verificados y aprobados (`paseador_estado_verificacion_id = 3` / `Constant.ID_APROBADO`) con `estado = 1`.
+  2. **Refactorización de `GET /api-paseape/paseadores/{uuid}` (`obtenerPerfil`):**
+     * Nuevo DTO compuesto de respuesta: `PaseadorDetalleResDto`, que encapsula los datos del paseador (`UsuarioResDto`) y su disponibilidad (`DisponibilidadPaseadorResDto`).
+     * Incorporación del parámetro opcional `fecha` (`?fecha=YYYY-MM-DD`).
+     * Soporte defensivo para resolver al paseador tanto si se envía su `paseador_uuid` como su `usuario_uuid`.
+  3. **Motor de Cálculo Dinámico de Cupos:**
+     * En `ISolicitudPaseoJpaRepository`: Nueva consulta agrupada JPQL `countMascotasOcupadasAgrupadoPorBloque(...)` que calcula en **una sola consulta** el total de mascotas reservadas en esa fecha exacta para solicitudes activas (`PENDIENTE [1]`, `ACEPTADA [2]`, `EN_CURSO [5]`).
+     * En `DisponibilidadPaseadorService.obtenerDisponibilidadPorPaseadorUuidYFecha(...)`:
+       * Cruza el día de la semana de la fecha (`fecha.getDayOfWeek()`) con la plantilla activa del paseador.
+       * Calcula `mascotas_ocupadas = COUNT(mascotas)`, `cupos_disponibles = max_mascotas - mascotas_ocupadas`.
+       * Determina `esta_lleno = (cupos_disponibles <= 0)`.
+       * Normalización temporal: Si la fecha es hoy, valida contra la hora civil de Lima (`America/Lima`); si la hora de inicio del bloque ya transcurrió o la fecha es pasada, fija `disponible = false`.
+* **Cómo funciona:**
+  * **Listado:** El cliente consulta `/paseadores?distrito_ids=21,31` y recibe todos los paseadores aprobados de esas zonas.
+  * **Detalle por fecha:** Al seleccionar un paseador y elegir una fecha en el calendario (`/paseadores/{uuid}?fecha=2026-10-26`), la API responde cada slot con campos calculados:
+    ```json
+    {
+      "bloque_codigo": "B08_09",
+      "hora_inicio": "08:00",
+      "hora_fin": "09:00",
+      "max_mascotas": 3,
+      "mascotas_ocupadas": 3,
+      "cupos_disponibles": 0,
+      "esta_lleno": true,
+      "disponible": false
+    }
+    ```
+    El frontend puede pintar en gris o inhabilitar inmediatamente los bloques llenos o vencidos.
+
+---
+
+### C. Módulo Transversal: Validación de Estructura de Documentos y Verificación DNI con RENIEC (COMPLETADA)
+* **Objetivo:** Asegurar que los paseadores solo se registren con documentos oficiales válidos, evitando números ficticios o malformados.
+* **Cómo se desarrolló:**
+  1. **Reglas en `AuthValidator.java`:**
+     * **DNI (1):** Prevalida en memoria 8 dígitos numéricos (`^[0-9]{8}$`).
+     * **Carnet de Extranjería (2):** Valida 9 dígitos numéricos (`^[0-9]{9}$`) con auto-padding de `'0'` a la izquierda para formatos legacy de 8 dígitos.
+     * **Pasaporte (3):** Valida exactamente 9 caracteres alfanuméricos de la carátula (`^[A-Z0-9]{9}$`) normalizado a mayúsculas.
+  2. **Nuevo Servicio `ApisPeruService.java`:**
+     * Encapsula la consulta HTTP vía `RestClient` hacia `https://dniruc.apisperu.com/api/v1/dni/{dni}` con Bearer token.
+     * **Comportamiento condicional por entorno (`app.env`):**
+       * En `local` o `dev` (`APP_ENV=local`): Omite la consulta remota a RENIEC para ahorrar cuotas y permitir desarrollo fluido con DNIs de prueba.
+       * En producción (`APP_ENV=prod`): Realiza la verificación obligatoria contra RENIEC. Si el DNI no existe o es inválido, rechaza el registro con error 400.
+* **Cómo funciona:** Durante `POST /auth/register/local` o `POST /auth/register/google`, el validador revisa la estructura según el tipo de documento y, para DNIs en producción, certifica su existencia real antes de persistir la cuenta.
+
+---
+
+### D. HU15 – Solicitar Paseo Inmediato ("Modalidad Tipo Taxi") (COMPLETADA)
+* **Objetivo:** Permitir al dueño de mascota solicitar un paseo para atención inmediata sin seleccionar un paseador específico, abriendo la oportunidad a los paseadores con cobertura en el distrito para adjudicarse el paseo de forma atómica y en tiempo real.
+* **Cómo se desarrolló:**
+  1. **Creación de la Solicitud (Cliente):**
+     * **Controlador:** `SolicitudPaseoClienteController` (`/cliente/solicitudes`).
+     * **Endpoint:** `POST /api-paseape/cliente/solicitudes/inmediata`.
+     * **Validador:** `SolicitudPaseoValidator` valida en memoria la existencia de mascotas, formato UUID, IDs de catálogo y dirección.
+     * **Reglas de Negocio:**
+       * El cliente se resuelve directamente desde el token JWT en el Security Context.
+       * Se valida que todas las mascotas pertenezcan al cliente y tengan `estado = 1`.
+       * Se crea con `tipo_modalidad_paseo_id = 2` (INMEDIATO), `solicitud_paseo_estado_id = 8` (SOLICITADA_BUSCANDO), `paseador_id = NULL`, `bloque_horario_id = NULL`, `fecha_programada = LocalDate.now()`.
+       * Tarifa congelada: `tarifa_hora_pen_snapshot = Constant.TARIFA_BASE_INMEDIATO_HORA_PEN` (25.00 PEN).
+       * Monto total: `(tarifa_snapshot / 60) * minutos_duracion * total_mascotas` con redondeo a 2 decimales (`HALF_UP`).
+       * Código de reserva: `"PAS-INM-" + YearMonth + "-" + RandomAlfanumerico(4)`.
+       * Se crean las relaciones N:M en `solicitud_paseo_mascota`.
+  2. **Radar de Oportunidades (Paseador):**
+     * **Controlador:** `SolicitudPaseoPaseadorController` (`/paseador/solicitudes`).
+     * **Endpoint:** `GET /api-paseape/paseador/solicitudes/disponibles`.
+     * Filtra solicitudes disponibles (`modalidad = 2`, `estado = 8`, `paseador IS NULL`) según el distrito de cobertura del paseador autenticado.
+     * Carga por lotes las mascotas participantes para evitar problemas N+1.
+  3. **Adjudicación Atómica del Paseo (Paseador):**
+     * **Endpoint:** `PATCH /api-paseape/paseador/solicitudes/{uuid}/tomar`.
+     * **Concurrencia Atómica:** Ejecuta un `UPDATE` condicional a nivel de repositorio JPA:
+       ```sql
+       UPDATE SolicitudPaseoEntity s
+       SET s.paseador.id = :paseadorId,
+           s.solicitudPaseoEstado.id = 2, -- ACEPTADA
+           s.fechaHoraAceptada = :ahoraUtc,
+           s.actualizadoEl = :ahoraUtc,
+           s.actualizadoPor = :emailPaseador
+       WHERE s.uuid = :solicitudUuid
+         AND s.paseador IS NULL
+         AND s.solicitudPaseoEstado.id = 8
+       ```
+     * Si las filas afectadas son 0, arroja `BadRequestException("La solicitud ya fue tomada por otro paseador o no está disponible.")`.
+     * Si es exitosa, registra la notificación en `notificaciones` para el usuario cliente con `tipo_notificacion_id = 2` (`SOLICITUD_ACEPTADA`).
+* **Componentes desarrollados:**
+  * `SolicitudPaseoClienteController`, `SolicitudPaseoPaseadorController`.
+  * `SolicitudPaseoService`.
+  * `SolicitudPaseoValidator`.
+  * `ISolicitudPaseoDtoMapper` (MapStruct).
+  * `ISolicitudPaseoRepository` / `SolicitudPaseoRepository`, `ISolicitudPaseoJpaRepository`.
+  * `ISolicitudPaseoMascotaRepository` / `SolicitudPaseoMascotaRepository`, `ISolicitudPaseoMascotaJpaRepository`.
+  * DTOs: `CrearSolicitudInmediataReqDto`, `SolicitudPaseoResDto`, `SolicitudMascotaResDto`.
 
 ---
 
 ## 4. Historias de Usuario Pendientes
-
-### HU12 – Buscar Paseadores Cercanos
-- **Objetivo:** Como dueño de una mascota, quiero buscar paseadores disponibles cerca de mi ubicación y filtrarlos según día y horario, para encontrar personas que atiendan en mi zona.
-- **Reglas de Negocio:**
-  1. **Ubicación:** Si el frontend envía `distrito_uuid`, se filtra por ese distrito. Si no se envía, el backend toma por defecto el distrito del perfil del cliente autenticado.
-  2. **Estado del Paseador:** Solo se muestran paseadores con estado de verificación aprobado (`paseador_estado_verificacion_id = 3`).
-  3. **Cálculo Dinámico de Disponibilidad y Cupo:**
-     - Cruce entre `disponibilidad_paseador` (activo = true), `solicitud_paseo` y `solicitud_paseo_mascota`.
-     - Se calcula: `cupo_restante = max_mascotas_bloque - mascotas_en_solicitudes_activas`.
-     - Solo se muestran paseadores cuyo `cupo_restante >= cantidad_mascotas_solicitadas`.
-  4. **Contratos:** Salida con lista de paseadores (`PaseadorResDto`) incluyendo su `uuid`, tarifa por hora, calificación, foto y distritos de atención.
-
----
-
-### HU15 – Solicitar Paseo Inmediato ("Modalidad Tipo Taxi")
-- **Objetivo:** Como dueño de una mascota, quiero solicitar un paseo para atención inmediata sin tener que seleccionar un paseador específico, para que mi mascota sea atendida con rapidez.
-- **Reglas de Negocio:**
-  1. **Payload del Request:** El cliente envía `mascota_uuids: List<String>`, `tipo_duracion_paseo_uuid`, `distrito_uuid`, `direccion_recojo`, `referencia_direccion`, `tipo_metodo_pago_uuid`. Los campos `paseador_uuid` y `bloque_horario_uuid` van nulos o no aplican.
-  2. **Estado Inicial:** Se crea con `tipo_modalidad_paseo_id = 2` (INMEDIATO) y estado `SOLICITADA_BUSCANDO` (id = 8).
-  3. **Visibilidad:** Disponible para todos los paseadores verificados con cobertura en el distrito del servicio.
-  4. **Concurrencia Atómica (Race Condition):**
-     - El primer paseador que acepte la solicitud se la adjudica mediante un `UPDATE` condicional a nivel de BD:
-       ```sql
-       UPDATE SolicitudPaseoEntity s
-       SET s.paseador = :paseador, s.estado = :estadoAceptada, s.fechaHoraAceptada = :ahora
-       WHERE s.id = :id AND s.paseador IS NULL AND s.estado.id = :estadoBuscando
-       ```
-     - Si el conteo de filas afectadas es 0, se responde un error controlado (`CONFLICT` / 400) indicando que la solicitud ya fue tomada por otro paseador.
-  5. **Notificación:** Al adjudicarse, se notifica inmediatamente al cliente (`SOLICITUD_ACEPTADA`).
-
----
 
 ### HU16 – Programar un Paseo para una Fecha Futura
 - **Objetivo:** Como dueño de una mascota, quiero seleccionar una fecha y hora futura para solicitar un paseo, para organizar el cuidado de mi mascota con anticipación.

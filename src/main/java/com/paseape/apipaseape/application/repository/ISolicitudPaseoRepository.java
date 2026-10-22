@@ -12,6 +12,10 @@ public interface ISolicitudPaseoRepository {
 
     SolicitudPaseo findById(Long id);
 
+    SolicitudPaseo findByUuid(String uuid);
+
+    SolicitudPaseo findByUuidWithDetails(String uuid);
+
     SolicitudPaseo findByCodigoReserva(String codigoReserva);
 
     List<SolicitudPaseo> findAllByClienteId(Long clienteId);
@@ -19,6 +23,10 @@ public interface ISolicitudPaseoRepository {
     List<SolicitudPaseo> findAllByPaseadorId(Long paseadorId);
 
     List<SolicitudPaseo> findAllByDistritoIdAndEstadoId(Integer distritoId, Integer estadoId);
+
+    List<SolicitudPaseo> findDisponiblesByDistrito(Integer modalidadId, Integer estadoId, Integer distritoId);
+
+    int adjudicarSolicitudInmediata(String solicitudUuid, Long paseadorId, Integer estadoAceptadaId, Integer estadoBuscandoId, java.time.LocalDateTime ahoraUtc, String emailPaseador);
 
     Integer countMascotasOcupadas(Long paseadorId, LocalDate fechaProgramada, Integer bloqueHorarioId, List<Integer> estadosIds);
 

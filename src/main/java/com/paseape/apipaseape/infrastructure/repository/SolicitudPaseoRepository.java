@@ -41,6 +41,41 @@ public class SolicitudPaseoRepository implements ISolicitudPaseoRepository {
     }
 
     @Override
+    public SolicitudPaseo findByUuid(String uuid) {
+        if (uuid == null || uuid.trim().isEmpty()) {
+            return null;
+        }
+        SolicitudPaseoEntity entity = jpaRepository.findByUuid(uuid.trim());
+        return entity != null ? mapper.toDomain(entity) : null;
+    }
+
+    @Override
+    public SolicitudPaseo findByUuidWithDetails(String uuid) {
+        if (uuid == null || uuid.trim().isEmpty()) {
+            return null;
+        }
+        SolicitudPaseoEntity entity = jpaRepository.findByUuidWithDetails(uuid.trim());
+        return entity != null ? mapper.toDomain(entity) : null;
+    }
+
+    @Override
+    public List<SolicitudPaseo> findDisponiblesByDistrito(Integer modalidadId, Integer estadoId, Integer distritoId) {
+        if (modalidadId == null || estadoId == null || distritoId == null) {
+            return List.of();
+        }
+        List<SolicitudPaseoEntity> entities = jpaRepository.findDisponiblesByDistrito(modalidadId, estadoId, distritoId);
+        return mapper.toDomainList(entities);
+    }
+
+    @Override
+    public int adjudicarSolicitudInmediata(String solicitudUuid, Long paseadorId, Integer estadoAceptadaId, Integer estadoBuscandoId, java.time.LocalDateTime ahoraUtc, String emailPaseador) {
+        if (solicitudUuid == null || solicitudUuid.trim().isEmpty() || paseadorId == null || estadoAceptadaId == null || estadoBuscandoId == null) {
+            return 0;
+        }
+        return jpaRepository.adjudicarSolicitudInmediata(solicitudUuid.trim(), paseadorId, estadoAceptadaId, estadoBuscandoId, ahoraUtc, emailPaseador);
+    }
+
+    @Override
     public SolicitudPaseo findByCodigoReserva(String codigoReserva) {
         if (codigoReserva == null || codigoReserva.trim().isEmpty()) {
             return null;

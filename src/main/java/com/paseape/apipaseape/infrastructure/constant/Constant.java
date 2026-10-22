@@ -180,4 +180,51 @@ public class Constant {
     public static final int MIN_MASCOTAS_PERMITIDAS = 1;
     public static final int MAX_MASCOTAS_PERMITIDAS = 6;
     public static final int CAPACIDAD_BASE_DEFAULT = 3;
+
+    // TIPO MODALIDAD PASEO
+    public static final int ID_MODALIDAD_PROGRAMADO = 1;
+    public static final int ID_MODALIDAD_INMEDIATO = 2;
+    public static final String MODALIDAD_PROGRAMADO = "PROGRAMADO";
+    public static final String MODALIDAD_INMEDIATO = "INMEDIATO";
+
+    // SOLICITUD PASEO ESTADO
+    public static final int ID_ESTADO_SOLICITUD_PENDIENTE = 1;
+    public static final int ID_ESTADO_SOLICITUD_ACEPTADA = 2;
+    public static final int ID_ESTADO_SOLICITUD_RECHAZADA = 3;
+    public static final int ID_ESTADO_SOLICITUD_CANCELADA = 4;
+    public static final int ID_ESTADO_SOLICITUD_EN_CURSO = 5;
+    public static final int ID_ESTADO_SOLICITUD_FINALIZADA = 6;
+    public static final int ID_ESTADO_SOLICITUD_VENCIDA = 7;
+    public static final int ID_ESTADO_SOLICITUD_BUSCANDO = 8;
+
+    public static final String ESTADO_SOLICITUD_PENDIENTE = "PENDIENTE";
+    public static final String ESTADO_SOLICITUD_ACEPTADA = "ACEPTADA";
+    public static final String ESTADO_SOLICITUD_RECHAZADA = "RECHAZADA";
+    public static final String ESTADO_SOLICITUD_CANCELADA = "CANCELADA";
+    public static final String ESTADO_SOLICITUD_EN_CURSO = "EN_CURSO";
+    public static final String ESTADO_SOLICITUD_FINALIZADA = "FINALIZADA";
+    public static final String ESTADO_SOLICITUD_VENCIDA = "VENCIDA";
+    public static final String ESTADO_SOLICITUD_BUSCANDO = "SOLICITADA_BUSCANDO";
+
+    // TIPO NOTIFICACION
+    public static final int ID_TIPO_NOTIFICACION_SOLICITUD_RECIBIDA = 1;
+    public static final int ID_TIPO_NOTIFICACION_SOLICITUD_ACEPTADA = 2;
+    public static final int ID_TIPO_NOTIFICACION_SOLICITUD_RECHAZADA = 3;
+    public static final int ID_TIPO_NOTIFICACION_PASEO_INICIADO = 4;
+    public static final int ID_TIPO_NOTIFICACION_PASEO_FINALIZADO = 5;
+    public static final int ID_TIPO_NOTIFICACION_SOLICITUD_CANCELADA = 6;
+
+    public static final String TITULO_NOTIF_SOLICITUD_ACEPTADA = "¡Tu paseo ha sido confirmado!";
+    public static final String REFERENCIA_TIPO_SOLICITUD_PASEO = "SOLICITUD_PASEO";
+
+    // TARIFA Y CONFIGURACION PASEO INMEDIATO (HU15)
+    public static final java.math.BigDecimal TARIFA_BASE_INMEDIATO_HORA_PEN = new java.math.BigDecimal("25.00");
+    public static final String PREFIX_CODIGO_RESERVA_INMEDIATO = "PAS-INM-";
+    public static final String REGEX_UUID = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
+
+    // MENSAJES FUNCIONALES HU15
+    public static final String MSJ_SOLICITUD_CREADA_EXITO = "Solicitud de paseo inmediato creada exitosamente";
+    public static final String MSJ_SOLICITUDES_DISPONIBLES_OBTENIDAS = "Solicitudes disponibles obtenidas exitosamente";
+    public static final String MSJ_SOLICITUD_TOMADA_EXITO = "Solicitud de paseo aceptada y adjudicada exitosamente";
+    public static final String MSJ_ERROR_SOLICITUD_NO_DISPONIBLE = "La solicitud ya fue tomada por otro paseador o no está disponible.";
 }

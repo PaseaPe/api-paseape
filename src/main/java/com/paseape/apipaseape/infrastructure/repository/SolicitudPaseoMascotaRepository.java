@@ -48,4 +48,22 @@ public class SolicitudPaseoMascotaRepository implements ISolicitudPaseoMascotaRe
         List<SolicitudPaseoMascotaEntity> entities = jpaRepository.findAllBySolicitudPaseoId(solicitudPaseoId);
         return mapper.toDomainList(entities);
     }
+
+    @Override
+    public List<SolicitudPaseoMascota> findAllBySolicitudPaseoIdWithDetails(Long solicitudPaseoId) {
+        if (solicitudPaseoId == null) {
+            return List.of();
+        }
+        List<SolicitudPaseoMascotaEntity> entities = jpaRepository.findAllBySolicitudPaseoIdWithDetails(solicitudPaseoId);
+        return mapper.toDomainList(entities);
+    }
+
+    @Override
+    public List<SolicitudPaseoMascota> findAllBySolicitudPaseoIdInWithDetails(List<Long> solicitudPaseoIds) {
+        if (solicitudPaseoIds == null || solicitudPaseoIds.isEmpty()) {
+            return List.of();
+        }
+        List<SolicitudPaseoMascotaEntity> entities = jpaRepository.findAllBySolicitudPaseoIdInWithDetails(solicitudPaseoIds);
+        return mapper.toDomainList(entities);
+    }
 }
