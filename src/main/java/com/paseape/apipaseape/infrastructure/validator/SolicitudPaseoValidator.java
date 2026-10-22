@@ -54,6 +54,10 @@ public class SolicitudPaseoValidator {
             return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El campo 'tipo_metodo_pago_id' es obligatorio y debe ser un valor positivo.");
         }
 
+        if (reqDto.getTarifaHoraPen() == null || reqDto.getTarifaHoraPen().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El campo 'tarifa_hora_pen' es obligatorio y debe ser mayor a 0.");
+        }
+
         if (!StringUtils.hasText(reqDto.getDireccionRecojo())) {
             return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El campo 'direccion_recojo' es obligatorio y no puede estar vacío.");
         }

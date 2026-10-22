@@ -22,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 
+import java.math.BigDecimal;
 import java.security.Principal;
 import java.util.Date;
 import java.util.List;
@@ -63,6 +64,7 @@ class SolicitudPaseoClienteControllerTest {
                 .distritoId(21)
                 .tipoDuracionPaseoId(1)
                 .tipoMetodoPagoId(1)
+                .tarifaHoraPen(new BigDecimal("25.00"))
                 .direccionRecojo("Av. Larco 100")
                 .build();
 

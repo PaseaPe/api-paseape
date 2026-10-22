@@ -162,6 +162,7 @@ class SolicitudPaseoServiceTest {
                 .distritoId(21)
                 .tipoDuracionPaseoId(2)
                 .tipoMetodoPagoId(1)
+                .tarifaHoraPen(new BigDecimal("25.00"))
                 .direccionRecojo("Av. Primavera 123")
                 .referenciaDireccion("Frente al parque")
                 .build();
@@ -232,6 +233,7 @@ class SolicitudPaseoServiceTest {
                 .distritoId(21)
                 .tipoDuracionPaseoId(2)
                 .tipoMetodoPagoId(1)
+                .tarifaHoraPen(new BigDecimal("25.00"))
                 .direccionRecojo("Av. Primavera 123")
                 .build();
 
@@ -262,6 +264,7 @@ class SolicitudPaseoServiceTest {
                 .distritoId(21)
                 .tipoDuracionPaseoId(2)
                 .tipoMetodoPagoId(1)
+                .tarifaHoraPen(new BigDecimal("25.00"))
                 .direccionRecojo("Av. Primavera 123")
                 .build();
 

@@ -8,6 +8,7 @@ import lombok.Setter;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.annotation.JsonNaming;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Getter
@@ -22,6 +23,7 @@ public class CrearSolicitudInmediataReqDto {
     private Integer distritoId;
     private Integer tipoDuracionPaseoId;
     private Integer tipoMetodoPagoId;
+    private BigDecimal tarifaHoraPen;
     private String direccionRecojo;
     private String referenciaDireccion;
 }

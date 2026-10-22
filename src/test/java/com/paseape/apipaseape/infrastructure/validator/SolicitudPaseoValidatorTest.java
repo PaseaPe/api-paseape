@@ -8,6 +8,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -40,6 +41,7 @@ class SolicitudPaseoValidatorTest {
                 .distritoId(21)
                 .tipoDuracionPaseoId(1)
                 .tipoMetodoPagoId(1)
+                .tarifaHoraPen(new BigDecimal("25.00"))
                 .direccionRecojo("Av. Principal 123")
                 .build();
         ErrorDetailDto err1 = validator.validarCrearSolicitudInmediata(req1);
@@ -51,6 +53,7 @@ class SolicitudPaseoValidatorTest {
                 .distritoId(21)
                 .tipoDuracionPaseoId(1)
                 .tipoMetodoPagoId(1)
+                .tarifaHoraPen(new BigDecimal("25.00"))
                 .direccionRecojo("Av. Principal 123")
                 .build();
         ErrorDetailDto err2 = validator.validarCrearSolicitudInmediata(req2);
@@ -65,6 +68,7 @@ class SolicitudPaseoValidatorTest {
                 .distritoId(21)
                 .tipoDuracionPaseoId(1)
                 .tipoMetodoPagoId(1)
+                .tarifaHoraPen(new BigDecimal("25.00"))
                 .direccionRecojo("Av. Principal 123")
                 .build();
         ErrorDetailDto error = validator.validarCrearSolicitudInmediata(req);
@@ -81,6 +85,7 @@ class SolicitudPaseoValidatorTest {
                 .distritoId(21)
                 .tipoDuracionPaseoId(1)
                 .tipoMetodoPagoId(1)
+                .tarifaHoraPen(new BigDecimal("25.00"))
                 .direccionRecojo("Av. Principal 123")
                 .build();
         ErrorDetailDto error = validator.validarCrearSolicitudInmediata(req);
@@ -96,6 +101,7 @@ class SolicitudPaseoValidatorTest {
                 .distritoId(0)
                 .tipoDuracionPaseoId(1)
                 .tipoMetodoPagoId(1)
+                .tarifaHoraPen(new BigDecimal("25.00"))
                 .direccionRecojo("Av. Principal 123")
                 .build();
         ErrorDetailDto error = validator.validarCrearSolicitudInmediata(req);
@@ -111,6 +117,7 @@ class SolicitudPaseoValidatorTest {
                 .distritoId(21)
                 .tipoDuracionPaseoId(null)
                 .tipoMetodoPagoId(1)
+                .tarifaHoraPen(new BigDecimal("25.00"))
                 .direccionRecojo("Av. Principal 123")
                 .build();
         ErrorDetailDto error = validator.validarCrearSolicitudInmediata(req);
@@ -126,11 +133,52 @@ class SolicitudPaseoValidatorTest {
                 .distritoId(21)
                 .tipoDuracionPaseoId(1)
                 .tipoMetodoPagoId(-1)
+                .tarifaHoraPen(new BigDecimal("25.00"))
                 .direccionRecojo("Av. Principal 123")
                 .build();
         ErrorDetailDto error = validator.validarCrearSolicitudInmediata(req);
         assertNotNull(error);
         assertTrue(error.getMessage().contains("tipo_metodo_pago_id"));
+    }
+
+    @Test
+    @DisplayName("validarCrearSolicitudInmediata - Falla si tarifaHoraPen es nula o menor o igual a cero")
+    void testValidarCrearSolicitud_InvalidTarifaHoraPen() {
+        var req1 = CrearSolicitudInmediataReqDto.builder()
+                .mascotaUuids(List.of(UUID.randomUUID().toString()))
+                .distritoId(21)
+                .tipoDuracionPaseoId(1)
+                .tipoMetodoPagoId(1)
+                .tarifaHoraPen(null)
+                .direccionRecojo("Av. Principal 123")
+                .build();
+        ErrorDetailDto err1 = validator.validarCrearSolicitudInmediata(req1);
+        assertNotNull(err1);
+        assertTrue(err1.getMessage().contains("tarifa_hora_pen"));
+
+        var req2 = CrearSolicitudInmediataReqDto.builder()
+                .mascotaUuids(List.of(UUID.randomUUID().toString()))
+                .distritoId(21)
+                .tipoDuracionPaseoId(1)
+                .tipoMetodoPagoId(1)
+                .tarifaHoraPen(BigDecimal.ZERO)
+                .direccionRecojo("Av. Principal 123")
+                .build();
+        ErrorDetailDto err2 = validator.validarCrearSolicitudInmediata(req2);
+        assertNotNull(err2);
+        assertTrue(err2.getMessage().contains("tarifa_hora_pen"));
+
+        var req3 = CrearSolicitudInmediataReqDto.builder()
+                .mascotaUuids(List.of(UUID.randomUUID().toString()))
+                .distritoId(21)
+                .tipoDuracionPaseoId(1)
+                .tipoMetodoPagoId(1)
+                .tarifaHoraPen(new BigDecimal("-10.00"))
+                .direccionRecojo("Av. Principal 123")
+                .build();
+        ErrorDetailDto err3 = validator.validarCrearSolicitudInmediata(req3);
+        assertNotNull(err3);
+        assertTrue(err3.getMessage().contains("tarifa_hora_pen"));
     }
 
     @Test
@@ -141,6 +189,7 @@ class SolicitudPaseoValidatorTest {
                 .distritoId(21)
                 .tipoDuracionPaseoId(1)
                 .tipoMetodoPagoId(1)
+                .tarifaHoraPen(new BigDecimal("25.00"))
                 .direccionRecojo("   ")
                 .build();
         ErrorDetailDto error = validator.validarCrearSolicitudInmediata(req);
@@ -156,6 +205,7 @@ class SolicitudPaseoValidatorTest {
                 .distritoId(21)
                 .tipoDuracionPaseoId(2)
                 .tipoMetodoPagoId(1)
+                .tarifaHoraPen(new BigDecimal("25.00"))
                 .direccionRecojo("Calle Los Álamos 456")
                 .referenciaDireccion("Frente al parque")
                 .build();

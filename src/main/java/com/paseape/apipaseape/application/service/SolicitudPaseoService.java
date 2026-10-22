@@ -94,7 +94,7 @@ public class SolicitudPaseoService {
             throw new BadRequestException(MessageCodes.ResponseCodeBR98, "El tipo de duración especificado no existe.");
         }
 
-        BigDecimal tarifaSnapshot = Constant.TARIFA_BASE_INMEDIATO_HORA_PEN;
+        BigDecimal tarifaSnapshot = reqDto.getTarifaHoraPen().setScale(2, RoundingMode.HALF_UP);
         BigDecimal minutos = BigDecimal.valueOf(tipoDuracion.getMinutos());
         BigDecimal totalMascotas = BigDecimal.valueOf(mascotas.size());
         BigDecimal montoTotal = tarifaSnapshot.multiply(minutos).multiply(totalMascotas)
