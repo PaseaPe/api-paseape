@@ -141,49 +141,28 @@ El Sprint 2 tiene como objetivo habilitar el núcleo operativo y transaccional d
 ---
 
 ### D. HU15 – Solicitar Paseo Inmediato ("Modalidad Tipo Taxi") (COMPLETADA)
-* **Objetivo:** Permitir al dueño de mascota solicitar un paseo para atención inmediata sin seleccionar un paseador específico, abriendo la oportunidad a los paseadores con cobertura en el distrito para adjudicarse el paseo de forma atómica y en tiempo real.
+* **Objetivo:** Permitir al dueño de una mascota solicitar un paseo para atención inmediata sin tener que elegir a un paseador específico por adelantado, proponiendo él mismo la tarifa por hora que desea pagar para que cualquier paseador verificado y disponible en su distrito pueda tomar el servicio con rapidez.
 * **Cómo se desarrolló:**
-  1. **Creación de la Solicitud (Cliente):**
-     * **Controlador:** `SolicitudPaseoClienteController` (`/cliente/solicitudes`).
-     * **Endpoint:** `POST /api-paseape/cliente/solicitudes/inmediata`.
-     * **Validador:** `SolicitudPaseoValidator` valida en memoria la existencia de mascotas, formato UUID, IDs de catálogo y dirección.
-     * **Reglas de Negocio:**
-       * El cliente se resuelve directamente desde el token JWT en el Security Context.
-       * Se valida que todas las mascotas pertenezcan al cliente y tengan `estado = 1`.
-       * Se crea con `tipo_modalidad_paseo_id = 2` (INMEDIATO), `solicitud_paseo_estado_id = 8` (SOLICITADA_BUSCANDO), `paseador_id = NULL`, `bloque_horario_id = NULL`, `fecha_programada = LocalDate.now()`.
-       * Tarifa congelada: `tarifa_hora_pen_snapshot = Constant.TARIFA_BASE_INMEDIATO_HORA_PEN` (25.00 PEN).
-       * Monto total: `(tarifa_snapshot / 60) * minutos_duracion * total_mascotas` con redondeo a 2 decimales (`HALF_UP`).
-       * Código de reserva: `"PAS-INM-" + YearMonth + "-" + RandomAlfanumerico(4)`.
-       * Se crean las relaciones N:M en `solicitud_paseo_mascota`.
-  2. **Radar de Oportunidades (Paseador):**
-     * **Controlador:** `SolicitudPaseoPaseadorController` (`/paseador/solicitudes`).
-     * **Endpoint:** `GET /api-paseape/paseador/solicitudes/disponibles`.
-     * Filtra solicitudes disponibles (`modalidad = 2`, `estado = 8`, `paseador IS NULL`) según el distrito de cobertura del paseador autenticado.
-     * Carga por lotes las mascotas participantes para evitar problemas N+1.
-  3. **Adjudicación Atómica del Paseo (Paseador):**
-     * **Endpoint:** `PATCH /api-paseape/paseador/solicitudes/{uuid}/tomar`.
-     * **Concurrencia Atómica:** Ejecuta un `UPDATE` condicional a nivel de repositorio JPA:
-       ```sql
-       UPDATE SolicitudPaseoEntity s
-       SET s.paseador.id = :paseadorId,
-           s.solicitudPaseoEstado.id = 2, -- ACEPTADA
-           s.fechaHoraAceptada = :ahoraUtc,
-           s.actualizadoEl = :ahoraUtc,
-           s.actualizadoPor = :emailPaseador
-       WHERE s.uuid = :solicitudUuid
-         AND s.paseador IS NULL
-         AND s.solicitudPaseoEstado.id = 8
-       ```
-     * Si las filas afectadas son 0, arroja `BadRequestException("La solicitud ya fue tomada por otro paseador o no está disponible.")`.
-     * Si es exitosa, registra la notificación en `notificaciones` para el usuario cliente con `tipo_notificacion_id = 2` (`SOLICITUD_ACEPTADA`).
-* **Componentes desarrollados:**
-  * `SolicitudPaseoClienteController`, `SolicitudPaseoPaseadorController`.
-  * `SolicitudPaseoService`.
-  * `SolicitudPaseoValidator`.
-  * `ISolicitudPaseoDtoMapper` (MapStruct).
-  * `ISolicitudPaseoRepository` / `SolicitudPaseoRepository`, `ISolicitudPaseoJpaRepository`.
-  * `ISolicitudPaseoMascotaRepository` / `SolicitudPaseoMascotaRepository`, `ISolicitudPaseoMascotaJpaRepository`.
-  * DTOs: `CrearSolicitudInmediataReqDto`, `SolicitudPaseoResDto`, `SolicitudMascotaResDto`.
+    1. **Endpoints Desarrollados:**
+        * `POST /api-paseape/cliente/solicitudes/inmediata`: Permite al cliente autenticado registrar una nueva solicitud bajo demanda enviando su oferta de tarifa por hora (`tarifa_hora_pen`).
+        * `GET /api-paseape/paseador/solicitudes/disponibles`: Permite al paseador consultar la lista de paseos inmediatos pendientes dentro de su distrito de cobertura con la tarifa propuesta por el cliente.
+        * `PATCH /api-paseape/paseador/solicitudes/{uuid}/tomar`: Permite al paseador aceptar y adjudicarse el paseo en tiempo real.
+    2. **Validaciones en `SolicitudPaseoValidator`:**
+        * Revisa que la lista de mascotas no esté vacía, no contenga duplicados y que cada código de mascota tenga un formato de UUID válido.
+        * Valida que el campo `tarifa_hora_pen` sea obligatorio y mayor a 0 (`> 0`).
+        * Verifica que los campos de distrito, duración del paseo, método de pago y dirección de recojo sean correctos y obligatorios.
+    3. **Lógica de Negocio y Reglas (`SolicitudPaseoService`):**
+        * **Comprobación de mascotas:** Confirma que todas las mascotas seleccionadas pertenezcan al cliente en sesión y se encuentren activas en el sistema.
+        * **Tarifa propuesta y cálculo total:** El cliente define en el pedido la tarifa por hora que está dispuesto a pagar (`tarifa_hora_pen`), la cual se congela en `tarifa_hora_pen_snapshot` y sirve de base para calcular el costo total multiplicando por los minutos de duración (30, 60, 90 o 120) y la cantidad de mascotas:
+          `monto_total = (tarifa_hora_pen / 60) * minutos * total_mascotas`
+        * **Código de reserva:** Genera automáticamente un código único reconocible con formato `PAS-INM-YYYYMM-XXXX` (por ejemplo, `PAS-INM-202610-A9F3`).
+        * **Estado inicial:** Se registra con fecha del día actual, sin paseador asignado (`paseador_id = null`) y en estado `SOLICITADA_BUSCANDO` (id = 8).
+        * **Asignación atómica (sin duplicidad ni choques):** La aceptación del paseo por parte del paseador se ejecuta mediante una actualización directa en la base de datos (`UPDATE ... WHERE paseador IS NULL AND estado = SOLICITADA_BUSCANDO`). De esta forma, si dos paseadores intentan presionar "Aceptar" al mismo tiempo, el sistema se lo entrega únicamente al primero y le muestra un mensaje claro al segundo indicando que el servicio ya fue tomado por otro paseador.
+        * **Notificación al cliente:** Al momento de concretarse la adjudicación, se crea una notificación interna en el sistema para que el cliente sepa de inmediato qué paseador atenderá a sus mascotas.
+* **Cómo funciona:**
+    * **El cliente solicita el paseo:** Entra a la app, elige sus mascotas, la duración del paseo, su método de pago, propone la tarifa por hora que desea pagar y confirma la dirección de recojo.
+    * **Los paseadores ven la solicitud:** A todos los paseadores autorizados de ese distrito les aparece la solicitud en su lista de disponibles con la tarifa propuesta por el cliente, el monto total calculado y los detalles del paseo y de las mascotas.
+    * **Un paseador toma el servicio:** El primer paseador que pulse en aceptar se adjudica el servicio; el estado cambia a `ACEPTADA` y el cliente recibe una notificación al instante con los datos de su paseador.
 
 ---
 
