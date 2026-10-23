@@ -227,4 +227,15 @@ public class Constant {
     public static final String MSJ_SOLICITUDES_DISPONIBLES_OBTENIDAS = "Solicitudes disponibles obtenidas exitosamente";
     public static final String MSJ_SOLICITUD_TOMADA_EXITO = "Solicitud de paseo aceptada y adjudicada exitosamente";
     public static final String MSJ_ERROR_SOLICITUD_NO_DISPONIBLE = "La solicitud ya fue tomada por otro paseador o no está disponible.";
+
+    // ZONA HORARIA
+    public static final String ZONE_ID_LIMA = "America/Lima";
+
+    // MOTIVOS NO DISPONIBLE
+    public static final String MOTIVO_HORARIO_EXPIRADO = "HORARIO_EXPIRADO";
+    public static final String MOTIVO_SIN_CUPOS = "SIN_CUPOS";
+
+    // MENSAJES DISPONIBILIDAD FECHA
+    public static final String MSJ_DISPONIBILIDAD_FECHA_OBTENIDA = "Disponibilidad del paseador por fecha obtenida exitosamente";
+    public static final String MSJ_ERROR_PASEADOR_NO_DISPONIBLE = "El paseador no existe, se encuentra inactivo o no cuenta con verificación aprobada.";
 }

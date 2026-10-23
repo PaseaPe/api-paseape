@@ -94,11 +94,25 @@ El Sprint 2 tiene como objetivo habilitar el núcleo operativo y transaccional d
      * Admite búsqueda por múltiples distritos (`@RequestParam List<Integer> distrito_ids`).
      * Soporte de fallback automático: Si el frontend no envía distritos, el backend inspecciona el usuario autenticado (`Principal`), consulta su perfil de `Cliente` y filtra automáticamente por su distrito por defecto.
      * Filtro estricto de seguridad: Solo lista paseadores verificados y aprobados (`paseador_estado_verificacion_id = 3` / `Constant.ID_APROBADO`) con `estado = 1`.
-  2. **Refactorización de `GET /api-paseape/paseadores/{uuid}` (`obtenerPerfil`):**
-     * Nuevo DTO compuesto de respuesta: `PaseadorDetalleResDto`, que encapsula los datos del paseador (`UsuarioResDto`) y su disponibilidad (`DisponibilidadPaseadorResDto`).
-     * Incorporación del parámetro opcional `fecha` (`?fecha=YYYY-MM-DD`).
+  2. **Consulta de Perfil de Paseador `GET /api-paseape/paseadores/{uuid}` (`obtenerPerfil`):**
+     * Retorna exclusivamente el detalle y perfil completo del paseador (`UsuarioResDto`), conteniendo sus datos personales, biografía, tarifa, calificación promedio y distrito de cobertura.
+     * Desacoplamiento de disponibilidad: No incluye la matriz de disponibilidad ni recibe parámetro `fecha`, manteniendo el endpoint liviano y enfocado únicamente en la información del perfil del paseador (la disponibilidad de bloques y cupos se delega al endpoint especializado `GET /api-paseape/paseadores/{paseadorUuid}/disponibilidad`).
      * Soporte defensivo para resolver al paseador tanto si se envía su `paseador_uuid` como su `usuario_uuid`.
-  3. **Motor de Cálculo Dinámico de Cupos:**
+  3. **Nuevo Endpoint Especializado para la App Móvil: `GET /api-paseape/paseadores/{paseadorUuid}/disponibilidad` (`obtenerDisponibilidadPorFecha`):**
+     * Diseñado específicamente para alimentar el carrusel de fechas del perfil del paseador en la app móvil.
+     * **Parámetros:**
+       * `paseadorUuid`: `@PathVariable` String con validación estricta de no nulidad, no vacío y formato canónico UUID (`Constant.REGEX_UUID`).
+       * `fecha`: `@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha`. Si no se envía, toma por defecto la fecha civil actual en Lima (`Constant.ZONE_ID_LIMA`). Si se envía, `PaseadorValidator` verifica que no sea anterior a la fecha actual de Lima.
+     * **Contratos DTO de Respuesta (`infrastructure.dto.response`):**
+       * `DisponibilidadPaseadorFechaResDto`: `paseador_uuid`, `fecha`, `dia_semana_id`, `dia_semana_descripcion`, `bloques`.
+       * `DisponibilidadBloqueFechaResDto`: `bloque_horario_id`, `bloque_codigo`, `hora_inicio`, `hora_fin`, `max_mascotas`, `mascotas_ocupadas`, `cupos_disponibles`, `esta_lleno`, `disponible`, `motivo_no_disponible`.
+     * **Lógica de Negocio (`PaseadorService.obtenerDisponibilidadPorFecha`):**
+       * Comprueba que el paseador exista, esté activo (`estado = 1`) y cuente con verificación aprobada (`estado_verificacion_id = 3` / `Constant.ID_APROBADO`).
+       * Obtiene la plantilla recurrente activa del paseador para ese día (`IDisponibilidadPaseadorRepository.findAllByPaseadorIdAndDiaSemanaId`) ordenada por `bloqueHorario.orden ASC`.
+       * Consulta en una única llamada JPQL las mascotas ocupadas por bloque (`solicitudPaseoRepository.countMascotasOcupadasAgrupadoPorBloque`) filtrando solicitudes activas (`PENDIENTE [1]`, `ACEPTADA [2]`, `EN_CURSO [5]`).
+       * Evalúa cupos disponibles: `cupos_disponibles = max(0, capacidad_maxima - ocupadas)`. Si se agotan, marca `esta_lleno = true`.
+       * Control de expiración horaria: Si la fecha consultada es hoy en Lima, cualquier bloque cuya `hora_inicio` no sea posterior a `LocalTime.now(ZoneId.of(Constant.ZONE_ID_LIMA))` se marca con `disponible = false` y `motivo_no_disponible = "HORARIO_EXPIRADO"`. Si no expiró pero no tiene cupos, asigna `"SIN_CUPOS"`. Si está libre, `motivo_no_disponible = null`.
+  4. **Motor de Cálculo Dinámico de Cupos:**
      * En `ISolicitudPaseoJpaRepository`: Nueva consulta agrupada JPQL `countMascotasOcupadasAgrupadoPorBloque(...)` que calcula en **una sola consulta** el total de mascotas reservadas en esa fecha exacta para solicitudes activas (`PENDIENTE [1]`, `ACEPTADA [2]`, `EN_CURSO [5]`).
      * En `DisponibilidadPaseadorService.obtenerDisponibilidadPorPaseadorUuidYFecha(...)`:
        * Cruza el día de la semana de la fecha (`fecha.getDayOfWeek()`) con la plantilla activa del paseador.
@@ -107,20 +121,34 @@ El Sprint 2 tiene como objetivo habilitar el núcleo operativo y transaccional d
        * Normalización temporal: Si la fecha es hoy, valida contra la hora civil de Lima (`America/Lima`); si la hora de inicio del bloque ya transcurrió o la fecha es pasada, fija `disponible = false`.
 * **Cómo funciona:**
   * **Listado:** El cliente consulta `/paseadores?distrito_ids=21,31` y recibe todos los paseadores aprobados de esas zonas.
-  * **Detalle por fecha:** Al seleccionar un paseador y elegir una fecha en el calendario (`/paseadores/{uuid}?fecha=2026-10-26`), la API responde cada slot con campos calculados:
+  * **Detalle por fecha (Carrusel Móvil):** Al seleccionar una fecha en el carrusel (`/paseadores/{paseadorUuid}/disponibilidad?fecha=2026-10-26`), la API responde cada slot con campos calculados:
     ```json
     {
-      "bloque_codigo": "B08_09",
-      "hora_inicio": "08:00",
-      "hora_fin": "09:00",
-      "max_mascotas": 3,
-      "mascotas_ocupadas": 3,
-      "cupos_disponibles": 0,
-      "esta_lleno": true,
-      "disponible": false
+      "status_code": 200,
+      "code": "00",
+      "message": "Disponibilidad del paseador por fecha obtenida exitosamente",
+      "response": {
+        "paseador_uuid": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+        "fecha": "2026-10-26",
+        "dia_semana_id": 1,
+        "dia_semana_descripcion": "LUNES",
+        "bloques": [
+          {
+            "bloque_horario_id": 3,
+            "bloque_codigo": "B08_09",
+            "hora_inicio": "08:00",
+            "hora_fin": "09:00",
+            "max_mascotas": 3,
+            "mascotas_ocupadas": 3,
+            "cupos_disponibles": 0,
+            "esta_lleno": true,
+            "disponible": false,
+            "motivo_no_disponible": "SIN_CUPOS"
+          }
+        ]
+      }
     }
     ```
-    El frontend puede pintar en gris o inhabilitar inmediatamente los bloques llenos o vencidos.
 
 ---
 
