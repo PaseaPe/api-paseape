@@ -90,6 +90,9 @@ public class SolicitudPaseoEntity extends Auditable {
     @Column(name = "motivo_rechazo_cancelacion", columnDefinition = "TEXT")
     private String motivoRechazoCancelacion;
 
+    @Column(name = "hora_vencimiento")
+    private LocalDateTime horaVencimiento;
+
     @Column(name = "fecha_hora_aceptada")
     private LocalDateTime fechaHoraAceptada;
 

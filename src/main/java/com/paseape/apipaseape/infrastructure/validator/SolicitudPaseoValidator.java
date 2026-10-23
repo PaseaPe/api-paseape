@@ -3,11 +3,14 @@ package com.paseape.apipaseape.infrastructure.validator;
 import com.paseape.apipaseape.infrastructure.constant.Constant;
 import com.paseape.apipaseape.infrastructure.constant.MessageCodes;
 import com.paseape.apipaseape.infrastructure.constant.StatusCodes;
+import com.paseape.apipaseape.infrastructure.dto.request.CancelarSolicitudReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.CrearSolicitudInmediataReqDto;
+import com.paseape.apipaseape.infrastructure.dto.request.RechazarSolicitudReqDto;
 import com.paseape.apipaseape.infrastructure.dto.response.ErrorDetailDto;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -54,7 +57,7 @@ public class SolicitudPaseoValidator {
             return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El campo 'tipo_metodo_pago_id' es obligatorio y debe ser un valor positivo.");
         }
 
-        if (reqDto.getTarifaHoraPen() == null || reqDto.getTarifaHoraPen().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+        if (reqDto.getTarifaHoraPen() == null || reqDto.getTarifaHoraPen().compareTo(BigDecimal.ZERO) <= 0) {
             return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El campo 'tarifa_hora_pen' es obligatorio y debe ser mayor a 0.");
         }
 
@@ -79,6 +82,46 @@ public class SolicitudPaseoValidator {
         }
         if (!UUID_PATTERN.matcher(uuid.trim()).matches()) {
             return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El formato del identificador " + nombreCampo + " no es válido.");
+        }
+        return null;
+    }
+
+    public ErrorDetailDto validarConsultaBandejaPaseador(String tab, Integer page, Integer size) {
+        if (!StringUtils.hasText(tab)) {
+            return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El parámetro 'tab' es estrictamente obligatorio.");
+        }
+        String tabUpper = tab.trim().toUpperCase();
+        if (!Constant.TAB_INMEDIATAS.equals(tabUpper) &&
+            !Constant.TAB_MIS_PASEOS.equals(tabUpper) &&
+            !Constant.TAB_EN_CURSO.equals(tabUpper) &&
+            !Constant.TAB_HISTORIAL.equals(tabUpper)) {
+            return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, Constant.MSJ_ERROR_TAB_INVALIDO);
+        }
+        if (page == null || page < 0) {
+            return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El número de página no puede ser negativo.");
+        }
+        if (size == null || size < 1 || size > Constant.SIZE_MAXIMO) {
+            return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El tamaño de página debe estar entre 1 y " + Constant.SIZE_MAXIMO + ".");
+        }
+        return null;
+    }
+
+    public ErrorDetailDto validarCancelarSolicitud(CancelarSolicitudReqDto reqDto) {
+        if (reqDto == null) {
+            return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El cuerpo de la solicitud no puede estar vacío.");
+        }
+        if (!StringUtils.hasText(reqDto.getMotivo()) || reqDto.getMotivo().trim().length() < 10) {
+            return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, Constant.MSJ_ERROR_MOTIVO_CANCELACION_OBLIGATORIO);
+        }
+        if (reqDto.getMotivo().trim().length() > 500) {
+            return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El motivo de cancelación no debe superar los 500 caracteres.");
+        }
+        return null;
+    }
+
+    public ErrorDetailDto validarRechazarSolicitud(RechazarSolicitudReqDto reqDto) {
+        if (reqDto != null && StringUtils.hasText(reqDto.getMotivoRechazo()) && reqDto.getMotivoRechazo().trim().length() > 500) {
+            return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El motivo de rechazo no debe superar los 500 caracteres.");
         }
         return null;
     }
