@@ -10,6 +10,7 @@ import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 
 import java.util.List;
+import java.util.Objects;
 
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface ISolicitudPaseoDtoMapper {
@@ -85,7 +86,7 @@ public interface ISolicitudPaseoDtoMapper {
             return List.of();
         }
         return list.stream()
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .map(this::toMascotaResDto)
                 .toList();
     }

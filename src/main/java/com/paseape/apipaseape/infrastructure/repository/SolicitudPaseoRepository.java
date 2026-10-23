@@ -1,6 +1,8 @@
 package com.paseape.apipaseape.infrastructure.repository;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoRepository;
@@ -10,6 +12,7 @@ import com.paseape.apipaseape.infrastructure.mapper.entity.ISolicitudPaseoDboMap
 import com.paseape.apipaseape.infrastructure.repository.jpa.ISolicitudPaseoJpaRepository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,7 +71,7 @@ public class SolicitudPaseoRepository implements ISolicitudPaseoRepository {
     }
 
     @Override
-    public int adjudicarSolicitudInmediata(String solicitudUuid, Long paseadorId, Integer estadoAceptadaId, Integer estadoBuscandoId, java.time.LocalDateTime ahoraUtc, String emailPaseador) {
+    public int adjudicarSolicitudInmediata(String solicitudUuid, Long paseadorId, Integer estadoAceptadaId, Integer estadoBuscandoId, LocalDateTime ahoraUtc, String emailPaseador) {
         if (solicitudUuid == null || solicitudUuid.trim().isEmpty() || paseadorId == null || estadoAceptadaId == null || estadoBuscandoId == null) {
             return 0;
         }
@@ -146,5 +149,48 @@ public class SolicitudPaseoRepository implements ISolicitudPaseoRepository {
         }
         List<SolicitudPaseoEntity> entities = jpaRepository.findFutureBookingsByPaseadorAndBloque(paseadorId, bloqueHorarioId, fechaHoy, estadosIds);
         return mapper.toDomainList(entities);
+    }
+
+    @Override
+    public Page<SolicitudPaseo> findInmediatasDisponiblesPaginado(
+            Integer modalidadId,
+            Integer estadoId,
+            Integer distritoId,
+            Long paseadorId,
+            Pageable pageable
+    ) {
+        if (modalidadId == null || estadoId == null || distritoId == null || paseadorId == null) {
+            return Page.empty(pageable);
+        }
+        Page<SolicitudPaseoEntity> entities =
+                jpaRepository.findInmediatasDisponiblesPaginado(modalidadId, estadoId, distritoId, paseadorId, pageable);
+        return entities.map(mapper::toDomain);
+    }
+
+    @Override
+    public Page<SolicitudPaseo> findByPaseadorIdAndEstadosPaginado(
+            Long paseadorId,
+            List<Integer> estadosIds,
+            Pageable pageable
+    ) {
+        if (paseadorId == null || estadosIds == null || estadosIds.isEmpty()) {
+            return Page.empty(pageable);
+        }
+        Page<SolicitudPaseoEntity> entities =
+                jpaRepository.findByPaseadorIdAndEstadosPaginado(paseadorId, estadosIds, pageable);
+        return entities.map(mapper::toDomain);
+    }
+
+    @Override
+    public int expirarSolicitudesInmediatasVencidas(
+            Integer modalidadInmediatoId,
+            Integer estadoBuscandoId,
+            Integer estadoVencidaId,
+            LocalDateTime ahora
+    ) {
+        if (modalidadInmediatoId == null || estadoBuscandoId == null || estadoVencidaId == null || ahora == null) {
+            return 0;
+        }
+        return jpaRepository.expirarSolicitudesInmediatasVencidas(modalidadInmediatoId, estadoBuscandoId, estadoVencidaId, ahora);
     }
 }

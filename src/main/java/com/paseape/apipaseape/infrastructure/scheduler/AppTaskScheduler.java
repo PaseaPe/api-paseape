@@ -1,13 +1,13 @@
 package com.paseape.apipaseape.infrastructure.scheduler;
 
+import com.paseape.apipaseape.application.service.HeartbeatApplicationService;
+import com.paseape.apipaseape.application.service.SolicitudPaseoService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-
-import com.paseape.apipaseape.application.service.HeartbeatApplicationService;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -23,8 +23,8 @@ public class AppTaskScheduler {
     private static final String COMPONENTE_OCI = "BACKEND_OCI_PASEAPE";
     private static final String IP_ORIGEN_OCI = "157.151.203.121";
 
-    // Inyección exclusiva de servicios de la capa de aplicación
     private final HeartbeatApplicationService heartbeatApplicationService;
+    private final SolicitudPaseoService solicitudPaseoService;
 
     /**
      * TAREA 1: Heartbeat preventivo anti-hibernación (Aiven MySQL).
@@ -41,6 +41,25 @@ public class AppTaskScheduler {
             log.info("[SCHEDULER] Tarea Database Heartbeat finalizada exitosamente.");
         } catch (Exception ex) {
             log.error("[SCHEDULER] Error crítico en Database Heartbeat: {}", ex.getMessage(), ex);
+        }
+    }
+
+    /**
+     * TAREA 2: Expiración automática de solicitudes inmediatas no tomadas tras 5 minutos.
+     * Se ejecuta cada 60 segundos (60,000 ms).
+     */
+    @Scheduled(
+            initialDelayString = "${app.scheduler.solicitudes-inmediatas.initial-delay-ms:15000}",
+            fixedRateString = "${app.scheduler.solicitudes-inmediatas.interval-ms:60000}"
+    )
+    public void expirarSolicitudesInmediatasVencidas() {
+        try {
+            int totalVencidas = solicitudPaseoService.expirarSolicitudesInmediatasVencidas();
+            if (totalVencidas > 0) {
+                log.info("[SCHEDULER] Se marcaron {} solicitudes inmediatas como VENCIDAS.", totalVencidas);
+            }
+        } catch (Exception ex) {
+            log.error("[SCHEDULER] Error al expirar solicitudes inmediatas vencidas: {}", ex.getMessage(), ex);
         }
     }
 }

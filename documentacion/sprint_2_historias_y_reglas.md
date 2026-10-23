@@ -63,12 +63,16 @@ El Sprint 2 tiene como objetivo habilitar el núcleo operativo y transaccional d
    - Campos: `max_mascotas` (cupo específico para el bloque), `activo` (booleano), `estado` (borrado lógico).
 2. **`solicitud_paseo`**:
    - Cabecera del servicio de paseo.
-   - Campos principales: `uuid`, `codigo_reserva`, `tipo_modalidad_paseo_id`, `tipo_metodo_pago_id`, `cliente_id`, `paseador_id` (nullable para modalidad inmediata), `distrito_id`, `direccion_recojo`, `referencia_direccion`, `fecha_programada`, `bloque_horario_id`, `tipo_duracion_paseo_id`, `tarifa_hora_pen_snapshot`, `monto_total`, `solicitud_paseo_estado_id`, `fecha_hora_aceptada`, `fecha_hora_inicio_real`, `fecha_hora_fin_real`, `motivo_rechazo_cancelacion`.
+   - Campos principales: `uuid`, `codigo_reserva`, `tipo_modalidad_paseo_id`, `tipo_metodo_pago_id`, `cliente_id`, `paseador_id` (nullable para modalidad inmediata), `distrito_id`, `direccion_recojo`, `referencia_direccion`, `fecha_programada`, `bloque_horario_id`, `tipo_duracion_paseo_id`, `tarifa_hora_pen_snapshot`, `monto_total`, `solicitud_paseo_estado_id`, `fecha_hora_aceptada`, `fecha_hora_inicio_real`, `fecha_hora_fin_real`, `motivo_rechazo_cancelacion`, `hora_vencimiento` (DATETIME nullable, asignado como NOW() + 5 min para solicitudes inmediatas - V2.0.5).
 3. **`solicitud_paseo_mascota`**:
    - Tabla asociativa N:M que relaciona `solicitud_paseo_id` con `mascota_id`. Permite que una solicitud atienda una o múltiples mascotas simultáneamente.
 4. **`notificaciones`**:
    - Alertas internas para clientes y paseadores.
    - Campos: `uuid`, `remitente_usuario_id` (nullable para eventos del sistema), `destinatario_usuario_id`, `tipo_notificacion_id`, `titulo`, `mensaje`, `referencia_id`, `referencia_tipo`, `leido` (booleano), `fecha_leido`.
+5. **`solicitud_paseo_descarte` (V2.0.4)**:
+   - Registro de descarte individual de solicitudes inmediatas por parte de los paseadores. Permite que un paseador rechace ver una solicitud abierta sin afectar la disponibilidad de la misma para el resto de paseadores en el distrito.
+   - Campos: `uuid`, `solicitud_paseo_id`, `paseador_id`, `motivo_descarte` (nullable), `estado` (borrado lógico).
+   - Restricción única: `(solicitud_paseo_id, paseador_id)`.
 
 ---
 
@@ -191,6 +195,36 @@ El Sprint 2 tiene como objetivo habilitar el núcleo operativo y transaccional d
     * **El cliente solicita el paseo:** Entra a la app, elige sus mascotas, la duración del paseo, su método de pago, propone la tarifa por hora que desea pagar y confirma la dirección de recojo.
     * **Los paseadores ven la solicitud:** A todos los paseadores autorizados de ese distrito les aparece la solicitud en su lista de disponibles con la tarifa propuesta por el cliente, el monto total calculado y los detalles del paseo y de las mascotas.
     * **Un paseador toma el servicio:** El primer paseador que pulse en aceptar se adjudica el servicio; el estado cambia a `ACEPTADA` y el cliente recibe una notificación al instante con los datos de su paseador.
+
+---
+
+### E. HU20 – Bandeja de Solicitudes del Paseador (4 Pestañas Paginadas) y Descarte de Inmediatas (COMPLETADA)
+* **Objetivo:** Permitir al paseador gestionar de manera unificada y eficiente todo su flujo de trabajo operativo desde la app móvil a través de 4 pestañas paginadas (`INMEDIATAS`, `MIS_PASEOS`, `EN_CURSO` e `HISTORIAL`), incorporando la capacidad de descartar solicitudes inmediatas sin afectar a otros paseadores y la expiración automática por inactividad.
+* **Cómo se desarrolló:**
+  1. **Endpoints Desarrollados:**
+     * `GET /api-paseape/paseador/solicitudes`: Endpoint unificado paginado con query params:
+       * `tab`: (`INMEDIATAS`, `MIS_PASEOS`, `EN_CURSO`, `HISTORIAL`, por defecto `INMEDIATAS`).
+       * `page`: Número de página (0-indexed, default `0`).
+       * `size`: Tamaño de página (default `10`, máx `50`).
+       * Retorna la envoltura `ResponseDto<PageResponseDto<SolicitudPaseoResDto>>`.
+     * `PATCH /api-paseape/paseador/solicitudes/{uuid}/descartar`: Permite al paseador en sesión descartar una solicitud inmediata pendiente de atención. Retorna `ResponseDto<Void>`.
+     * `PATCH /api-paseape/paseador/solicitudes/{uuid}/aceptar`: Permite al paseador aceptar una solicitud programada en estado `PENDIENTE`. Pasa a estado `ACEPTADA` (2), fija `fecha_hora_aceptada = NOW()` y notifica al cliente (`SOLICITUD_ACEPTADA`).
+     * `PATCH /api-paseape/paseador/solicitudes/{uuid}/rechazar`: Permite al paseador declinar una solicitud programada en estado `PENDIENTE` con motivo opcional. Pasa a estado `RECHAZADA` (3), libera el cupo inmediatamente y notifica al cliente (`SOLICITUD_RECHAZADA`).
+     * `PATCH /api-paseape/paseador/solicitudes/{uuid}/cancelar`: Permite al paseador cancelar un paseo previamente confirmado (`ACEPTADA`) que no haya iniciado aún, exigiendo un comentario/motivo obligatorio (`motivo` entre 10 y 500 caracteres). Pasa a estado `CANCELADA` (4), libera el cupo de inmediato y notifica al cliente (`SOLICITUD_CANCELADA`).
+  2. **Estructura de las 4 Pestañas:**
+     * **Pestaña 1 - `INMEDIATAS`:** Muestra solicitudes bajo demanda abiertas (`tipo_modalidad_paseo_id = 2 [INMEDIATO]`, `solicitud_paseo_estado_id = 8 [SOLICITADA_BUSCANDO]`, `paseador_id IS NULL`) ubicadas en el distrito de cobertura del paseador y excluyendo las que el paseador ya haya descartado (`solicitud_paseo_descarte`).
+     * **Pestaña 2 - `MIS_PASEOS`:** Agrupa solicitudes asignadas al paseador (`paseador_id = :paseadorId`) en estados activos preparatorios: `PENDIENTE` (1) [solicitudes programadas entrantes] y `ACEPTADA` (2) [tanto programadas aceptadas como inmediatas tomadas]. Ordenadas cronológicamente por `fecha_programada ASC, creado_el DESC`.
+     * **Pestaña 3 - `EN_CURSO`:** Paseos activos en ejecución asignados al paseador (`solicitud_paseo_estado_id = 5 [EN_CURSO]`), ordenados por `fecha_hora_inicio_real DESC`.
+     * **Pestaña 4 - `HISTORIAL`:** Registro histórico de solicitudes asignadas en estados terminales: `FINALIZADA` (6), `CANCELADA` (4), `RECHAZADA` (3) y `VENCIDA` (7), ordenadas por `actualizado_el DESC`.
+  3. **Mecanismo de Descarte Individual:**
+     * Al pulsar el botón "Rechazar" en una solicitud inmediata, se registra la tupla `(solicitud_paseo_id, paseador_id)` en `solicitud_paseo_descarte` con `motivo_descarte = null` (o texto descriptivo opcional).
+     * La solicitud desaparece inmediatamente de la pestaña `INMEDIATAS` del paseador, permaneciendo visible y adjudicable para los demás paseadores del distrito.
+  4. **Job Scheduled de Expiración Automática (5 Minutos):**
+     * En `AppTaskScheduler`: Tarea programada periódica cada 60 segundos (`expirarSolicitudesInmediatasVencidas`) que evalúa solicitudes inmediatas con `solicitud_paseo_estado_id = 8 [SOLICITADA_BUSCANDO]` comparando `hora_vencimiento <= LocalDateTime.now()`.
+     * Al crearse una solicitud inmediata, el campo `hora_vencimiento` se calcula y persiste como `LocalDateTime.now().plusMinutes(5)` (para solicitudes programadas permanece `null`).
+     * Si no han sido tomadas y se alcanza la hora límite, la consulta JPQL actualiza el estado a `VENCIDA` (id = 7) sin manipular manualmente columnas de auditoría, permitiendo que Spring Data JPA gestione los metadatos de auditoría automáticamente.
+  5. **DTO Genérico de Paginación:**
+     * Se incorporó `PageResponseDto<T>` en `infrastructure.dto.response` con metadatos: `items`, `page`, `size`, `total_elements`, `total_pages`, `is_first`, `is_last`, `has_next` y `has_previous`.
 
 ---
 

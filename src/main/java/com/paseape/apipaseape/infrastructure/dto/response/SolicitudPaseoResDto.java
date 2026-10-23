@@ -41,5 +41,6 @@ public class SolicitudPaseoResDto {
     private String clienteUuid;
     private String clienteNombreCompleto;
     private List<SolicitudMascotaResDto> mascotas;
+    private LocalDateTime horaVencimiento;
     private LocalDateTime creadoEl;
 }
