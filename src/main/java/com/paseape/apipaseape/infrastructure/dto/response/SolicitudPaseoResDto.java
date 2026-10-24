@@ -34,6 +34,9 @@ public class SolicitudPaseoResDto {
     private String distritoDescripcion;
     private String direccionRecojo;
     private String referenciaDireccion;
+    private java.time.LocalDate fechaProgramada;
+    private Integer bloqueHorarioId;
+    private String bloqueHorarioCodigo;
     private BigDecimal tarifaHoraPenSnapshot;
     private BigDecimal montoTotal;
     private String paseadorUuid;

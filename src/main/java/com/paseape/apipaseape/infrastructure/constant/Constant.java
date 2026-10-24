@@ -215,15 +215,18 @@ public class Constant {
     public static final int ID_TIPO_NOTIFICACION_SOLICITUD_CANCELADA = 6;
 
     public static final String TITULO_NOTIF_SOLICITUD_ACEPTADA = "¡Tu paseo ha sido confirmado!";
+    public static final String TITULO_NOTIF_SOLICITUD_RECIBIDA = "¡Nueva solicitud de paseo recibida!";
     public static final String REFERENCIA_TIPO_SOLICITUD_PASEO = "SOLICITUD_PASEO";
 
-    // TARIFA Y CONFIGURACION PASEO INMEDIATO (HU15)
+    // TARIFA Y CONFIGURACION PASEO INMEDIATO (HU15) Y PROGRAMADO (HU16)
     public static final java.math.BigDecimal TARIFA_BASE_INMEDIATO_HORA_PEN = new java.math.BigDecimal("25.00");
     public static final String PREFIX_CODIGO_RESERVA_INMEDIATO = "PAS-INM-";
+    public static final String PREFIX_CODIGO_RESERVA_PROGRAMADO = "PAS-PROG-";
     public static final String REGEX_UUID = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
 
-    // MENSAJES FUNCIONALES HU15
+    // MENSAJES FUNCIONALES HU15 Y HU16
     public static final String MSJ_SOLICITUD_CREADA_EXITO = "Solicitud de paseo inmediato creada exitosamente";
+    public static final String MSJ_SOLICITUD_PROGRAMADA_CREADA_EXITO = "Solicitud de paseo programado creada exitosamente";
     public static final String MSJ_SOLICITUDES_DISPONIBLES_OBTENIDAS = "Solicitudes disponibles obtenidas exitosamente";
     public static final String MSJ_SOLICITUD_TOMADA_EXITO = "Solicitud de paseo aceptada y adjudicada exitosamente";
     public static final String MSJ_ERROR_SOLICITUD_NO_DISPONIBLE = "La solicitud ya fue tomada por otro paseador o no está disponible.";
