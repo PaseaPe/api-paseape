@@ -10,7 +10,9 @@ public interface INotificacionRepository {
 
     Notificacion findById(Long id);
 
-    List<Notificacion> findAllByDestinatarioUsuarioId(Long usuarioId);
+    List<Notificacion> findAllNoLeidasByDestinatarioUsuarioId(Long usuarioId);
 
     Integer countNoLeidasByDestinatarioUsuarioId(Long usuarioId);
+
+    List<Notificacion> saveAll(List<Notificacion> notificaciones);
 }

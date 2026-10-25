@@ -11,7 +11,7 @@ public interface INotificacionJpaRepository extends JpaRepository<NotificacionEn
 
     NotificacionEntity findById(long id);
 
-    List<NotificacionEntity> findAllByDestinatarioUsuarioIdOrderByCreadoElDesc(Long usuarioId);
+    List<NotificacionEntity> findAllByDestinatarioUsuarioIdAndLeidoFalseOrderByCreadoElDesc(Long usuarioId);
 
     Integer countByDestinatarioUsuarioIdAndLeidoFalse(Long usuarioId);
 }

@@ -38,11 +38,11 @@ public class NotificacionRepository implements INotificacionRepository {
     }
 
     @Override
-    public List<Notificacion> findAllByDestinatarioUsuarioId(Long usuarioId) {
+    public List<Notificacion> findAllNoLeidasByDestinatarioUsuarioId(Long usuarioId) {
         if (usuarioId == null) {
             return List.of();
         }
-        List<NotificacionEntity> entities = jpaRepository.findAllByDestinatarioUsuarioIdOrderByCreadoElDesc(usuarioId);
+        List<NotificacionEntity> entities = jpaRepository.findAllByDestinatarioUsuarioIdAndLeidoFalseOrderByCreadoElDesc(usuarioId);
         return mapper.toDomainList(entities);
     }
 
@@ -53,5 +53,17 @@ public class NotificacionRepository implements INotificacionRepository {
         }
         Integer count = jpaRepository.countByDestinatarioUsuarioIdAndLeidoFalse(usuarioId);
         return count != null ? count : 0;
+    }
+
+    @Override
+    public List<Notificacion> saveAll(List<Notificacion> notificaciones) {
+        if (notificaciones == null || notificaciones.isEmpty()) {
+            return List.of();
+        }
+        List<NotificacionEntity> entities = notificaciones.stream()
+                .map(mapper::toEntity)
+                .toList();
+        List<NotificacionEntity> savedEntities = jpaRepository.saveAll(entities);
+        return mapper.toDomainList(savedEntities);
     }
 }

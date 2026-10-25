@@ -353,14 +353,33 @@ El Sprint 2 tiene como objetivo habilitar el núcleo operativo y transaccional d
     * **Flujo de Cancelación Ágil:** Si el cliente solicitó un servicio y desiste antes de que un paseador lo acepte, puede cancelar de forma directa sin redactar un motivo. Si el servicio ya contaba con un paseador comprometido (`ACEPTADA`), el sistema exige un motivo justificado (≥ 10 caracteres) antes de liberar el cupo y notificar de inmediato al paseador asignado.
 ---
 
-## 4. Historias de Usuario Pendientes
-
-### HU22 y HU23 – Notificaciones Transaccionales (Aceptación e Inicio de Paseo)
-- **Objetivo:** Notificar al cliente en tiempo real y vía correo cuando el paseador acepte o inicie el paseo.
-- **Reglas de Negocio:**
-  1. Se inserta un registro en la tabla `notificaciones` con `remitente_usuario_id`, `destinatario_usuario_id`, `tipo_notificacion_id` (`2` para Aceptada, `4` para Iniciado), título y mensaje descriptivo.
-  2. Se realiza el envío de correo transaccional mediante el API de Brevo con auditoría en `brevo_email`.
-  3. El envío a Brevo no debe comprometer la transacción principal en caso de error externo de red o timeout.
+### K. HU22 y HU23 – Bandeja de Notificaciones Internas Activas y Alertas Transaccionales (COMPLETADA)
+* **Objetivo:** Proveer una bandeja de notificaciones reactiva, segura y desacoplada para clientes y paseadores que liste exclusivamente las alertas activas pendientes de atención (`leido = false`) y permita marcarlas masivamente como leídas en una sola acción, registrando la fecha/hora de lectura en UTC y delegando la auditoría técnica (`actualizado_el`, `actualizado_por`) al interceptor JPA sin alterar el borrado lógico (`estado = 1`).
+* **Cómo se desarrolló:**
+    1. **Endpoints Desarrollados (`NotificacionController`):**
+        * `GET /api-paseape/notificaciones`: Retorna la lista de notificaciones no leídas correspondientes al usuario en sesión (`destinatario_usuario_id = :usuarioId`), ordenadas cronológicamente por `creado_el DESC`. Responde `ResponseDto<List<NotificacionResDto>>`.
+        * `PATCH /api-paseape/notificaciones/marcar-todas-leidas`: Marca como leídas de forma masiva e idempotente todas las notificaciones pendientes del usuario autenticado (`leido = true`, `fecha_leido = NOW()`), retornando `ResponseDto<Void>`.
+    2. **Reglas de Negocio y Ciclo de Vida (`NotificacionService`):**
+        * **Bandeja Efímera de Alertas:** La bandeja de notificaciones de la aplicación móvil está concebida como un buzón activo de tareas y eventos pendientes. Al consultarla, el backend filtra de forma estricta por `leido = false`.
+        * **Persistencia Histórica y No Destructiva:** Al marcar como leídas, el registro **no** altera su columna `estado` (se mantiene en `1`), garantizando que la entidad continúe activa en base de datos para futuras auditorías o trazabilidad administrativa, sin ser ocultada por la restricción global `@SQLRestriction("estado = 1")`.
+        * **Auditoría Transparente sin Manipulación Manual:** El servicio modifica únicamente los campos de negocio (`leido = true`, `fechaLeido = LocalDateTime.now(ZoneOffset.UTC)`). Los atributos de auditoría `actualizado_el` y `actualizado_por` son inyectados de forma automática por `AuditingEntityListener` y `JpaAuditingConfig`.
+        * **Aislamiento Multitenant Estricto:** La consulta y la mutación están estrictamente acotadas al ID del usuario resuelto desde el token JWT en el `SecurityContextHolder`. Ningún usuario puede visualizar o modificar alertas pertenecientes a otros roles o cuentas.
+    3. **Persistencia Optimizada sobre Índices (`INotificacionJpaRepository` y `NotificacionRepository`):**
+        * Consulta derivada: `findAllByDestinatarioUsuarioIdAndLeidoFalseOrderByCreadoElDesc(Long usuarioId)`.
+        * Apalancamiento en el índice compuesto B-Tree `idx_notif_leido (destinatario_usuario_id ASC, leido ASC)` creado en la migración `V2.0.3`.
+        * Guardado en lote desacoplado: Implementación del método `saveAll(List<Notificacion> notificaciones)` en `NotificacionRepository` para procesar el dirty checking y persistencia de las entidades modificadas.
+    4. **Contratos DTO y Mappers (`NotificacionResDto`, `INotificacionDtoMapper`):**
+        * `NotificacionResDto`: DTO plano con `@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)`, ocultando IDs numéricos internos y exponiendo `uuid`, `tipo_notificacion_id`, `tipo_notificacion_descripcion`, `titulo`, `mensaje`, `referencia_id`, `referencia_tipo`, `remitente_uuid`, `remitente_nombre_completo`, `leido`, `fecha_leido` y `creado_el`.
+        * `INotificacionDtoMapper`: Mapper MapStruct Spring component con método calificado `@Named("resolverNombreRemitente")` para concatenar nombres y apellidos del remitente.
+    5. **Disparadores Transaccionales del Negocio (Eventos Integrados):**
+        * `SOLICITUD_RECIBIDA` (Tipo 1): Al crearse una solicitud programada, se alerta al paseador preseleccionado.
+        * `SOLICITUD_ACEPTADA` (Tipo 2): Al confirmarse una solicitud inmediata o programada por el paseador, se alerta al cliente con el código de reserva.
+        * `SOLICITUD_RECHAZADA` (Tipo 3): Al declinar el paseador una solicitud programada, se alerta al cliente con el motivo del rechazo.
+        * `SOLICITUD_CANCELADA` (Tipo 6): Al cancelar un paseo confirmado (por paseador o cliente), se alerta a la contraparte con el motivo correspondiente.
+* **Cómo funciona:**
+    * El usuario abre la sección de notificaciones en la app móvil. El backend recupera únicamente las alertas con `leido = false` y `estado = 1` asociadas a su cuenta.
+    * Al pulsar el botón "Marcar todas como leídas", se dispara `PATCH /notificaciones/marcar-todas-leidas`, actualizando en bloque `leido = true` y `fecha_leido = NOW()`.
+    * En la siguiente consulta, la lista retorna vacía (`[]`), manteniendo la bandeja limpia y sin sobrecargar la interfaz del usuario.
 
 ---
 
