@@ -1,6 +1,8 @@
 package com.paseape.apipaseape.infrastructure.repository.jpa;
 
 import com.paseape.apipaseape.infrastructure.entity.SolicitudPaseoEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -111,5 +113,74 @@ public interface ISolicitudPaseoJpaRepository extends JpaRepository<SolicitudPas
             @Param("bloqueHorarioId") Integer bloqueHorarioId,
             @Param("fechaHoy") LocalDate fechaHoy,
             @Param("estadosIds") List<Integer> estadosIds
+    );
+
+    @Query(value = "SELECT s FROM SolicitudPaseoEntity s " +
+            "JOIN FETCH s.tipoModalidadPaseo " +
+            "JOIN FETCH s.tipoMetodoPago " +
+            "JOIN FETCH s.tipoDuracionPaseo " +
+            "JOIN FETCH s.distrito " +
+            "JOIN FETCH s.solicitudPaseoEstado " +
+            "JOIN FETCH s.cliente c " +
+            "JOIN FETCH c.usuario " +
+            "WHERE s.tipoModalidadPaseo.id = :modalidadId " +
+            "AND s.solicitudPaseoEstado.id = :estadoId " +
+            "AND s.paseador IS NULL " +
+            "AND s.distrito.id = :distritoId " +
+            "AND s.id NOT IN (" +
+            "   SELECT d.solicitudPaseo.id FROM SolicitudPaseoDescarteEntity d " +
+            "   WHERE d.paseador.id = :paseadorId" +
+            ")",
+            countQuery = "SELECT COUNT(s) FROM SolicitudPaseoEntity s " +
+                    "WHERE s.tipoModalidadPaseo.id = :modalidadId " +
+                    "AND s.solicitudPaseoEstado.id = :estadoId " +
+                    "AND s.paseador IS NULL " +
+                    "AND s.distrito.id = :distritoId " +
+                    "AND s.id NOT IN (" +
+                    "   SELECT d.solicitudPaseo.id FROM SolicitudPaseoDescarteEntity d " +
+                    "   WHERE d.paseador.id = :paseadorId" +
+                    ")")
+    Page<SolicitudPaseoEntity> findInmediatasDisponiblesPaginado(
+            @Param("modalidadId") Integer modalidadId,
+            @Param("estadoId") Integer estadoId,
+            @Param("distritoId") Integer distritoId,
+            @Param("paseadorId") Long paseadorId,
+            Pageable pageable
+    );
+
+    @Query(value = "SELECT s FROM SolicitudPaseoEntity s " +
+            "JOIN FETCH s.tipoModalidadPaseo " +
+            "JOIN FETCH s.tipoMetodoPago " +
+            "JOIN FETCH s.tipoDuracionPaseo " +
+            "JOIN FETCH s.distrito " +
+            "JOIN FETCH s.solicitudPaseoEstado " +
+            "JOIN FETCH s.cliente c " +
+            "JOIN FETCH c.usuario " +
+            "LEFT JOIN FETCH s.paseador p " +
+            "LEFT JOIN FETCH p.usuario " +
+            "WHERE s.paseador.id = :paseadorId " +
+            "AND s.solicitudPaseoEstado.id IN :estadosIds",
+            countQuery = "SELECT COUNT(s) FROM SolicitudPaseoEntity s " +
+                    "WHERE s.paseador.id = :paseadorId " +
+                    "AND s.solicitudPaseoEstado.id IN :estadosIds")
+    Page<SolicitudPaseoEntity> findByPaseadorIdAndEstadosPaginado(
+            @Param("paseadorId") Long paseadorId,
+            @Param("estadosIds") List<Integer> estadosIds,
+            Pageable pageable
+    );
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE SolicitudPaseoEntity s " +
+            "SET s.solicitudPaseoEstado.id = :estadoVencidaId " +
+            "WHERE s.tipoModalidadPaseo.id = :modalidadInmediatoId " +
+            "AND s.solicitudPaseoEstado.id = :estadoBuscandoId " +
+            "AND s.paseador IS NULL " +
+            "AND s.horaVencimiento IS NOT NULL " +
+            "AND s.horaVencimiento <= :ahora")
+    int expirarSolicitudesInmediatasVencidas(
+            @Param("modalidadInmediatoId") Integer modalidadInmediatoId,
+            @Param("estadoBuscandoId") Integer estadoBuscandoId,
+            @Param("estadoVencidaId") Integer estadoVencidaId,
+            @Param("ahora") LocalDateTime ahora
     );
 }

@@ -34,6 +34,7 @@ public class SolicitudPaseo {
     private BigDecimal montoTotal;
     private SolicitudPaseoEstado solicitudPaseoEstado;
     private String motivoRechazoCancelacion;
+    private LocalDateTime horaVencimiento;
     private LocalDateTime fechaHoraAceptada;
     private LocalDateTime fechaHoraInicioReal;
     private LocalDateTime fechaHoraFinReal;

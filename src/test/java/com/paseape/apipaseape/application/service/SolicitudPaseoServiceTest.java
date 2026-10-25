@@ -7,6 +7,7 @@ import com.paseape.apipaseape.application.repository.IDisponibilidadPaseadorRepo
 import com.paseape.apipaseape.application.repository.IMascotaRepository;
 import com.paseape.apipaseape.application.repository.INotificacionRepository;
 import com.paseape.apipaseape.application.repository.IPaseadorRepository;
+import com.paseape.apipaseape.application.repository.ISolicitudPaseoDescarteRepository;
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoMascotaRepository;
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoRepository;
 import com.paseape.apipaseape.application.repository.ITipoDuracionPaseoRepository;
@@ -82,6 +83,8 @@ class SolicitudPaseoServiceTest {
     private IDiaSemanaRepository diaSemanaRepository;
     @Mock
     private INotificacionRepository notificacionRepository;
+    @Mock
+    private ISolicitudPaseoDescarteRepository solicitudPaseoDescarteRepository;
 
     private ISolicitudPaseoDtoMapper solicitudPaseoDtoMapper;
     private SolicitudPaseoService service;
@@ -110,6 +113,7 @@ class SolicitudPaseoServiceTest {
                 disponibilidadPaseadorRepository,
                 diaSemanaRepository,
                 notificacionRepository,
+                solicitudPaseoDescarteRepository,
                 solicitudPaseoDtoMapper
         );
 
@@ -848,5 +852,26 @@ class SolicitudPaseoServiceTest {
 
         assertEquals(MessageCodes.ResponseCodeBR03, ex.code);
         assertTrue(ex.getMessage().contains("no cuenta con cupo suficiente"));
+    }
+
+    @Test
+    @DisplayName("expirarSolicitudesInmediatasVencidas - Éxito al expirar solicitudes vencidas")
+    void testExpirarSolicitudesInmediatasVencidas() {
+        when(solicitudPaseoRepository.expirarSolicitudesInmediatasVencidas(
+                eq(Constant.ID_MODALIDAD_INMEDIATO),
+                eq(Constant.ID_ESTADO_SOLICITUD_BUSCANDO),
+                eq(Constant.ID_ESTADO_SOLICITUD_VENCIDA),
+                any(LocalDateTime.class)
+        )).thenReturn(3);
+
+        int total = service.expirarSolicitudesInmediatasVencidas();
+
+        assertEquals(3, total);
+        verify(solicitudPaseoRepository, times(1)).expirarSolicitudesInmediatasVencidas(
+                eq(Constant.ID_MODALIDAD_INMEDIATO),
+                eq(Constant.ID_ESTADO_SOLICITUD_BUSCANDO),
+                eq(Constant.ID_ESTADO_SOLICITUD_VENCIDA),
+                any(LocalDateTime.class)
+        );
     }
 }
