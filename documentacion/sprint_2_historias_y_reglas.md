@@ -10,15 +10,15 @@ El Sprint 2 tiene como objetivo habilitar el núcleo operativo y transaccional d
 - Gestión de disponibilidad semanal de los paseadores (Completada).
 - Búsqueda y filtrado dinámico de paseadores por ubicación, horario y cupo disponible por fecha (Completada).
 - Validación de identidad y documentos oficiales (DNI con RENIEC/ApisPerú condicional por entorno, Carnet de Extranjería y Pasaporte) (Completada).
-- Flujo de creación y contratación de paseos: modalidad inmediata ("Tipo Taxi" - HU15) y modalidad programada para fechas futuras (HU16-HU19).
-- Soporte para paseos con múltiples mascotas (relación N:M).
-- Ciclo de vida completo del servicio de paseo (Aceptar, Rechazar, Iniciar, Finalizar, Cancelar - HU21).
+- Flujo de creación, confirmación y contratación de paseos: modalidad inmediata ("Tipo Taxi" - HU15) y modalidad programada para fechas futuras con validación de bloques contiguos y método de pago (HU16, HU18, HU19) (Completada).
+- Soporte para paseos con múltiples mascotas (relación N:M - HU17) (Completada).
+- Bandeja operativa del paseador y gestión de estados del servicio de paseo (Aceptar, Rechazar, Descartar, Cancelar y Expiración Automática - HU20, HU21) (Completada).
 - Sistema de notificaciones internas modulares con soporte para Short Polling y alertas por correo vía Brevo (HU22, HU23).
 - **Identificación pública:** Todos los contratos de entrada (`*ReqDto`) y salida (`*ResDto`) emplean exclusivamente `uuid` en lugar de IDs numéricos internos.
 
 ---
 
-## 2. Modelo de Base de Datos (Sincronizado hasta `V2.0.3`)
+## 2. Modelo de Base de Datos (Sincronizado hasta `V2.0.5`)
 
 ### 2.1. Modificación a Tablas Existentes
 - **`paseadores`**:
@@ -228,68 +228,83 @@ El Sprint 2 tiene como objetivo habilitar el núcleo operativo y transaccional d
 
 ---
 
+### F. HU16 – Programar un Paseo para una Fecha Futura (COMPLETADA)
+* **Objetivo:** Permitir al dueño de una mascota seleccionar una fecha y bloque horario futuro para solicitar un paseo con un paseador específico y organizar el cuidado de sus mascotas con anticipación.
+* **Cómo se desarrolló:**
+  1. **Endpoint Desarrollado:**
+     * `POST /api-paseape/cliente/solicitudes/programada` (`SolicitudPaseoClienteController.crearSolicitudProgramada`).
+     * **Contrato de Entrada (`CrearSolicitudProgramadaReqDto`):** `paseador_uuid`, `mascota_uuids`, `distrito_id`, `fecha_programada`, `bloque_horario_id`, `tipo_duracion_paseo_id`, `tipo_metodo_pago_id`, `direccion_recojo` y `referencia_direccion`.
+  2. **Validaciones en `SolicitudPaseoValidator.validarCrearSolicitudProgramada`:**
+     * Comprueba obligatoriedad y formato UUID canónico (`Constant.REGEX_UUID`) de `paseador_uuid` y de cada elemento en `mascota_uuids` (sin duplicados).
+     * Verifica presencia de `fecha_programada`, IDs positivos para `distrito_id`, `bloque_horario_id`, `tipo_duracion_paseo_id`, `tipo_metodo_pago_id` y longitudes máximas de `direccion_recojo` y `referencia_direccion` (255 caracteres).
+  3. **Lógica de Negocio (`SolicitudPaseoService.crearSolicitudProgramada`):**
+     * **Resolución defensiva del paseador:** Busca primero por `paseador_uuid` y, como respaldo, por `usuario_uuid` asociado al perfil del paseador.
+     * **Estado y cobertura del paseador:** Verifica que el paseador esté activo (`estado = 1`), cuente con verificación aprobada (`estado_verificacion_id = 3` / `Constant.ID_APROBADO`), tenga tarifa por hora configurada (`> 0`) y que `distrito_id` coincida con su distrito de cobertura.
+     * **Validación temporal civil (`America/Lima`):** Verifica que `fecha_programada` no sea anterior a la fecha actual de Lima (`hoyLima`). Si es para el mismo día, exige que `hora_inicio` del bloque inicial sea estrictamente posterior a la hora civil actual (`ahoraLima`).
+     * **Validación de disponibilidad y cupo:** Determina el día de la semana (`dia_semana` ISO-8601), comprueba que el paseador tenga disponibilidad activa en el bloque (o bloques contiguos) y valida que `mascotas_ocupadas + nuevas_mascotas <= max_mascotas_bloque` considerando solicitudes en estados `PENDIENTE` (1), `ACEPTADA` (2) y `EN_CURSO` (5).
+     * **Congelamiento de tarifa y registro:** Almacena `tarifa_hora_pen_snapshot = paseador.getTarifaHoraPen()`, calcula `monto_total`, genera el código `PAS-PRG-YYYYMM-XXXX` (`Constant.PREFIX_CODIGO_RESERVA_PROGRAMADO`), persiste la solicitud en estado `PENDIENTE` (id = 1) con `hora_vencimiento = null` y registra la notificación interna `SOLICITUD_RECIBIDA` (id = 1) para el paseador.
+
+---
+
+### G. HU17 – Seleccionar Mascotas para el Paseo (Múltiples Mascotas N:M) (COMPLETADA)
+* **Objetivo:** Permitir al dueño de mascotas elegir cuáles de sus mascotas registradas participarán en un mismo paseo (tanto inmediato como programado).
+* **Cómo se desarrolló:**
+  1. **Validación Estructural (`SolicitudPaseoValidator`):**
+     * Exige que `mascota_uuids` contenga al menos un elemento, que todos los identificadores cumplan con `Constant.REGEX_UUID` y que no existan UUIDs repetidos dentro de la solicitud (`Set<String>`).
+  2. **Validación de Pertenencia y Estado (`SolicitudPaseoService.validarYObtenerMascotas`):**
+     * Comprueba en base de datos que cada mascota exista, pertenezca estrictamente al `Cliente` autenticado y tenga estado activo (`estado = 1`).
+  3. **Persistencia Relacional N:M (`solicitud_paseo_mascota`):**
+     * Registra en lote (`solicitudPaseoMascotaRepository.saveAll`) un vínculo en `solicitud_paseo_mascota` por cada mascota participante y devuelve el detalle completo (`List<SolicitudMascotaResDto>`) en `SolicitudPaseoResDto`.
+
+---
+
+### H. HU18 – Seleccionar Duración y Bloques Contiguos (COMPLETADA)
+* **Objetivo:** Permitir al dueño elegir la duración del servicio (`30`, `60`, `90` o `120` minutos) asegurando la reserva y validación de cupo en bloques horarios consecutivos cuando corresponda.
+* **Cómo se desarrolló:**
+  1. **Evaluación de Bloques Requeridos (`tipo_duracion_paseo`):**
+     * Duraciones de `30 MINUTOS` (id = 1) y `60 MINUTOS` (id = 2) requieren **1 bloque horario** (`bloques_requeridos = 1`).
+     * Duraciones de `90 MINUTOS` (id = 3) y `120 MINUTOS` (id = 4) requieren **2 bloques horarios consecutivos** (`bloques_requeridos = 2`).
+  2. **Validación de Bloques Contiguos (`IBloqueHorarioRepository.findByOrden`):**
+     * Cuando `bloques_requeridos == 2`, el servicio calcula `ordenSiguiente = bloqueInicial.getOrden() + 1` (validando que no supere el último bloque del día `orden = 17` / `22:00 - 23:00`).
+     * Verifica que el paseador tenga disponibilidad activa y cupo suficiente (`mascotas_ocupadas + nuevas_mascotas <= max_mascotas_bloque`) en **ambos bloques horarios consecutivos**.
+  3. **Fórmula Tarifaria Exacta (`calcularMontoTotal`):**
+     * `monto_total = (tarifa_hora_pen_snapshot * minutos_duracion * total_mascotas) / 60` con escala de 2 decimales y redondeo `RoundingMode.HALF_UP`.
+
+---
+
+### I. HU19 – Confirmación de Solicitud y Método de Pago (COMPLETADA)
+* **Objetivo:** Permitir al dueño revisar todos los datos finales del servicio en una pantalla de resumen previa en el frontend y confirmar el método de pago (`YAPE / PLIN` o `EFECTIVO`) al enviar la solicitud (tanto inmediata como programada) al backend.
+* **Cómo se desarrolló:**
+  1. **Flujo de Confirmación Final (Frontend ➔ Backend):**
+     * Antes de disparar la petición HTTP hacia `POST /api-paseape/cliente/solicitudes/inmediata` o `POST /api-paseape/cliente/solicitudes/programada`, el frontend presenta una pantalla de confirmación con el resumen completo del paseo (mascotas seleccionadas, duración, dirección de recojo, fecha/bloque horario o modalidad inmediata, tarifa por hora, monto total estimado y método de pago).
+  2. **Validación de Método de Pago (`SolicitudPaseoValidator`):**
+     * Se valida que `tipo_metodo_pago_id` sea obligatorio y positivo (`1: YAPE / PLIN`, `2: EFECTIVO`).
+  3. **Generación de Código de Reserva y Persistencia Transaccional (`SolicitudPaseoService`):**
+     * Se genera un código de reserva único con formato determinista mediante `generarCodigoReserva`:
+       * `PAS-INM-YYYYMM-XXXX` para paseos inmediatos (`Constant.PREFIX_CODIGO_RESERVA_INMEDIATO`).
+       * `PAS-PRG-YYYYMM-XXXX` para paseos programados (`Constant.PREFIX_CODIGO_RESERVA_PROGRAMADO`).
+     * Dentro de una única transacción (`@Transactional(rollbackFor = Exception.class)`), se persiste la cabecera en `solicitud_paseo`, el detalle de mascotas en `solicitud_paseo_mascota` y la notificación interna correspondiente, retornando el `SolicitudPaseoResDto` completo con todos los datos confirmados.
+
+---
+
+### J. HU21 – Consultar y Gestionar Estados de la Solicitud (COMPLETADA)
+* **Objetivo:** Permitir consultar las solicitudes según su estado operativo y ejecutar las transiciones de estado correspondientes con validaciones de negocio y notificaciones automáticas.
+* **Cómo se desarrolló:**
+  1. **Endpoints de Consulta (`SolicitudPaseoPaseadorController`):**
+     * `GET /api-paseape/paseador/solicitudes?tab={INMEDIATAS|MIS_PASEOS|EN_CURSO|HISTORIAL}&page=0&size=10`: Consulta paginada de solicitudes filtradas por pestaña operativa.
+     * `GET /api-paseape/paseador/solicitudes/disponibles`: Listado de solicitudes inmediatas en búsqueda activa dentro del distrito de cobertura del paseador.
+  2. **Endpoints de Transición de Estado (`SolicitudPaseoPaseadorController`):**
+     * `PATCH /api-paseape/paseador/solicitudes/{uuid}/tomar`: Adjudicación atómica de solicitud inmediata (`SOLICITADA_BUSCANDO` [8] ➔ `ACEPTADA` [2]), asigna el paseador, fija `fecha_hora_aceptada` y notifica al cliente (`SOLICITUD_ACEPTADA`).
+     * `PATCH /api-paseape/paseador/solicitudes/{uuid}/descartar`: Descarte individual de solicitud inmediata por parte del paseador en `solicitud_paseo_descarte`.
+     * `PATCH /api-paseape/paseador/solicitudes/{uuid}/aceptar`: Aceptación de solicitud programada (`PENDIENTE` [1] ➔ `ACEPTADA` [2]), registra `fecha_hora_aceptada = LocalDateTime.now()` y notifica al cliente (`SOLICITUD_ACEPTADA`).
+     * `PATCH /api-paseape/paseador/solicitudes/{uuid}/rechazar`: Rechazo de solicitud programada (`PENDIENTE` [1] ➔ `RECHAZADA` [3]) con `motivo_rechazo` opcional (`RechazarSolicitudReqDto`), libera el cupo del bloque horario y notifica al cliente (`SOLICITUD_RECHAZADA`).
+     * `PATCH /api-paseape/paseador/solicitudes/{uuid}/cancelar`: Cancelación por el paseador de un paseo previamente confirmado (`ACEPTADA` [2] ➔ `CANCELADA` [4]) antes de su inicio, validando `motivo` obligatorio entre 10 y 500 caracteres (`CancelarSolicitudReqDto`), liberando el cupo y notificando al cliente (`SOLICITUD_CANCELADA`).
+  3. **Transición Automática por Expiración (`AppTaskScheduler`):**
+     * Tarea programada cada 60 segundos (`expirarSolicitudesInmediatasVencidas`) que transiciona solicitudes inmediatas de `SOLICITADA_BUSCANDO` (8) a `VENCIDA` (7) cuando `hora_vencimiento <= LocalDateTime.now()`.
+
+---
+
 ## 4. Historias de Usuario Pendientes
-
-### HU16 – Programar un Paseo para una Fecha Futura
-- **Objetivo:** Como dueño de una mascota, quiero seleccionar una fecha y hora futura para solicitar un paseo, para organizar el cuidado de mi mascota con anticipación.
-- **Reglas de Negocio:**
-  1. **Validación Temporal:** La fecha y bloque seleccionados no pueden ser anteriores a la fecha y hora civil actual de Lima (`America/Lima`).
-  2. **Validación de Cupo:**
-     - Debe existir disponibilidad activa del paseador para el `dia_semana` correspondiente a la `fecha_programada` y el `bloque_horario` solicitado.
-     - `mascotas_actuales + nuevas_mascotas <= max_mascotas_bloque`.
-  3. **Congelamiento de Tarifa:** Se almacena `tarifa_hora_pen_snapshot = paseador.getTarifaHoraPen()`.
-  4. **Cálculo de Monto Total:** Basado en tarifa, duración y número de mascotas.
-  5. **Estado Inicial:** Registrada en estado `PENDIENTE` (id = 1).
-  6. **Notificación:** Se notifica al paseador (`SOLICITUD_RECIBIDA`).
-
----
-
-### HU17 – Seleccionar Mascotas para el Paseo (Múltiples Mascotas N:M)
-- **Objetivo:** Como dueño de mascotas, quiero elegir cuáles de mis mascotas registradas participarán en el paseo.
-- **Reglas de Negocio:**
-  1. El cliente envía `mascota_uuids: List<String>`.
-  2. El backend valida que la lista no esté vacía, no contenga duplicados y que **todas** las mascotas pertenezcan al cliente autenticado y tengan estado activo (`estado = 1`).
-  3. Se persiste un registro en `solicitud_paseo_mascota` por cada mascota vinculada a la solicitud.
-
----
-
-### HU18 – Seleccionar Duración y Bloques Contiguos
-- **Objetivo:** Como dueño, quiero elegir la duración del servicio (30, 60, 90 o 120 minutos).
-- **Reglas de Negocio:**
-  1. Duraciones de 30 y 60 minutos ocupan **1 bloque horario**.
-  2. Duraciones de 90 y 120 minutos ocupan **2 bloques horarios consecutivos**:
-     - Se valida que el segundo bloque exista (campo `orden` consecutivo en `bloque_horario`).
-     - El paseador debe tener disponibilidad activa y cupo suficiente en **ambos bloques horarios**.
-  3. **Fórmula Tarifaria:**
-     `monto_total = (tarifa_hora_pen_snapshot / 60) * minutos_duracion * total_mascotas`
-
----
-
-### HU19 – Confirmación de Solicitud y Método de Pago
-- **Objetivo:** Como dueño, quiero revisar los detalles antes de enviar y confirmar el método de pago (Yape/Plin o Efectivo).
-- **Reglas de Negocio:**
-  1. Se valida el método de pago mediante su UUID de catálogo (`tipo_metodo_pago_uuid`).
-  2. Se genera un código de reserva único con formato determinista:
-     `PAS-YYYYMM-XXXX` (ej. `PAS-202610-A9F3`).
-  3. Se confirma la persistencia de la cabecera, los ítems de mascotas y el evento de auditoría/notificación.
-
----
-
-### HU21 – Consultar y Gestionar Estados de la Solicitud
-- **Objetivo:** Como dueño o paseador, quiero consultar el estado de mis servicios y transicionar sus fases según corresponda.
-- **Endpoints de Consulta:**
-  - `GET /api-paseape/cliente/solicitudes`: Historial y solicitudes activas del cliente.
-  - `GET /api-paseape/paseador/solicitudes`: Solicitudes del paseador filtradas por estado (Pendientes, Programadas, En Curso, Historial).
-  - Ambos endpoints retornan objetos con el `solicitud_uuid` y los `uuid` de entidades relacionadas.
-- **Endpoints de Transición de Estado (Paseador):**
-  - `PATCH /api-paseape/paseador/solicitudes/aceptar`: Pasa de `PENDIENTE` a `ACEPTADA`, registra `fecha_hora_aceptada = NOW()`.
-  - `PATCH /api-paseape/paseador/solicitudes/rechazar`: Pasa de `PENDIENTE` a `RECHAZADA`, registra `motivo_rechazo_cancelacion`.
-  - `PATCH /api-paseape/paseador/solicitudes/iniciar`: Pasa de `ACEPTADA` a `EN_CURSO`, registra `fecha_hora_inicio_real = NOW()`.
-  - `PATCH /api-paseape/paseador/solicitudes/finalizar`: Pasa de `EN_CURSO` a `FINALIZADA`, registra `fecha_hora_fin_real = NOW()`.
-- **Endpoints de Cancelación (Cliente / Paseador):**
-  - `PATCH /api-paseape/solicitudes/cancelar`: Cancela una solicitud en estado `PENDIENTE` o `ACEPTADA` registrando el motivo.
-
----
 
 ### HU22 y HU23 – Notificaciones Transaccionales (Aceptación e Inicio de Paseo)
 - **Objetivo:** Notificar al cliente en tiempo real y vía correo cuando el paseador acepte o inicie el paseo.
