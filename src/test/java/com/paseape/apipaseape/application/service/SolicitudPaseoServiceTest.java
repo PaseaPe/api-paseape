@@ -1,6 +1,9 @@
 package com.paseape.apipaseape.application.service;
 
+import com.paseape.apipaseape.application.repository.IBloqueHorarioRepository;
 import com.paseape.apipaseape.application.repository.IClienteRepository;
+import com.paseape.apipaseape.application.repository.IDiaSemanaRepository;
+import com.paseape.apipaseape.application.repository.IDisponibilidadPaseadorRepository;
 import com.paseape.apipaseape.application.repository.IMascotaRepository;
 import com.paseape.apipaseape.application.repository.INotificacionRepository;
 import com.paseape.apipaseape.application.repository.IPaseadorRepository;
@@ -9,11 +12,15 @@ import com.paseape.apipaseape.application.repository.ISolicitudPaseoMascotaRepos
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoRepository;
 import com.paseape.apipaseape.application.repository.ITipoDuracionPaseoRepository;
 import com.paseape.apipaseape.application.repository.IUsuarioRepository;
+import com.paseape.apipaseape.domain.entity.BloqueHorario;
 import com.paseape.apipaseape.domain.entity.Cliente;
+import com.paseape.apipaseape.domain.entity.DiaSemana;
+import com.paseape.apipaseape.domain.entity.DisponibilidadPaseador;
 import com.paseape.apipaseape.domain.entity.DistritoLima;
 import com.paseape.apipaseape.domain.entity.Mascota;
 import com.paseape.apipaseape.domain.entity.Notificacion;
 import com.paseape.apipaseape.domain.entity.Paseador;
+import com.paseape.apipaseape.domain.entity.PaseadorEstadoVerificacion;
 import com.paseape.apipaseape.domain.entity.SolicitudPaseo;
 import com.paseape.apipaseape.domain.entity.SolicitudPaseoEstado;
 import com.paseape.apipaseape.domain.entity.SolicitudPaseoMascota;
@@ -26,6 +33,7 @@ import com.paseape.apipaseape.domain.entity.Usuario;
 import com.paseape.apipaseape.infrastructure.constant.Constant;
 import com.paseape.apipaseape.infrastructure.constant.MessageCodes;
 import com.paseape.apipaseape.infrastructure.dto.request.CrearSolicitudInmediataReqDto;
+import com.paseape.apipaseape.infrastructure.dto.request.CrearSolicitudProgramadaReqDto;
 import com.paseape.apipaseape.infrastructure.dto.response.SolicitudPaseoResDto;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
 import com.paseape.apipaseape.infrastructure.mapper.dto.ISolicitudPaseoDtoMapper;
@@ -39,7 +47,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -64,6 +75,12 @@ class SolicitudPaseoServiceTest {
     private IMascotaRepository mascotaRepository;
     @Mock
     private ITipoDuracionPaseoRepository tipoDuracionPaseoRepository;
+    @Mock
+    private IBloqueHorarioRepository bloqueHorarioRepository;
+    @Mock
+    private IDisponibilidadPaseadorRepository disponibilidadPaseadorRepository;
+    @Mock
+    private IDiaSemanaRepository diaSemanaRepository;
     @Mock
     private INotificacionRepository notificacionRepository;
     @Mock
@@ -92,6 +109,9 @@ class SolicitudPaseoServiceTest {
                 usuarioRepository,
                 mascotaRepository,
                 tipoDuracionPaseoRepository,
+                bloqueHorarioRepository,
+                disponibilidadPaseadorRepository,
+                diaSemanaRepository,
                 notificacionRepository,
                 solicitudPaseoDescarteRepository,
                 solicitudPaseoDtoMapper
@@ -154,6 +174,9 @@ class SolicitudPaseoServiceTest {
                 .uuid(UUID.randomUUID().toString())
                 .usuario(paseadorUsuario)
                 .distritoCobertura(new DistritoLima(21))
+                .tarifaHoraPen(new BigDecimal("25.00"))
+                .estadoVerificacion(PaseadorEstadoVerificacion.builder().id(Constant.ID_APROBADO).descripcion("APROBADO").build())
+                .maxMascotasPredeterminado(3)
                 .estado(Constant.ESTADO_LOGICO_ACTIVO)
                 .build();
     }
@@ -402,6 +425,433 @@ class SolicitudPaseoServiceTest {
         assertEquals(MessageCodes.ResponseCodeBR03, ex.code);
         assertEquals(Constant.MSJ_ERROR_SOLICITUD_NO_DISPONIBLE, ex.getMessage());
         verify(notificacionRepository, never()).save(any(Notificacion.class));
+    }
+
+    @Test
+    @DisplayName("crearSolicitudProgramada - Éxito con 1 bloque (60 min) y persistencia de notificación")
+    void testCrearSolicitudProgramada_Exito_1Bloque() throws BadRequestException {
+        LocalDate fechaFutura = LocalDate.now(ZoneId.of("America/Lima")).plusDays(3);
+        BloqueHorario bloque = BloqueHorario.builder()
+                .id(5)
+                .codigo("B10_11")
+                .orden(5)
+                .horaInicio(LocalTime.of(10, 0))
+                .horaFin(LocalTime.of(11, 0))
+                .build();
+
+        var req = CrearSolicitudProgramadaReqDto.builder()
+                .paseadorUuid(paseador.getUuid())
+                .mascotaUuids(List.of(mascota1.getUuid(), mascota2.getUuid()))
+                .distritoId(21)
+                .fechaProgramada(fechaFutura)
+                .bloqueHorarioId(5)
+                .tipoDuracionPaseoId(2)
+                .tipoMetodoPagoId(1)
+                .direccionRecojo("Av. José Pardo 123")
+                .referenciaDireccion("Frente al parque Kennedy")
+                .build();
+
+        when(usuarioRepository.findByCorreo("cliente@paseape.com")).thenReturn(clienteUsuario);
+        when(clienteRepository.findByUsuarioId(10L)).thenReturn(cliente);
+        when(mascotaRepository.findByUuid(mascota1.getUuid())).thenReturn(mascota1);
+        when(mascotaRepository.findByUuid(mascota2.getUuid())).thenReturn(mascota2);
+        when(paseadorRepository.findByUuid(paseador.getUuid())).thenReturn(paseador);
+        when(bloqueHorarioRepository.findById(5)).thenReturn(bloque);
+        when(tipoDuracionPaseoRepository.findById(2)).thenReturn(duracion60Min);
+
+        int numDia = fechaFutura.getDayOfWeek().getValue();
+        when(diaSemanaRepository.findByNumeroDia(numDia)).thenReturn(DiaSemana.builder().id(numDia).numeroDia(numDia).build());
+
+        DisponibilidadPaseador disp = DisponibilidadPaseador.builder()
+                .id(50L)
+                .paseadorId(paseador.getId())
+                .diaSemanaId(numDia)
+                .bloqueHorarioId(5)
+                .maxMascotas(3)
+                .estado(true)
+                .build();
+
+        when(disponibilidadPaseadorRepository.findByPaseadorIdAndDiaSemanaIdAndBloqueHorarioId(2L, numDia, 5))
+                .thenReturn(disp);
+        when(solicitudPaseoRepository.countMascotasOcupadas(eq(2L), eq(fechaFutura), eq(5), anyList()))
+                .thenReturn(0);
+
+        when(solicitudPaseoRepository.save(any(SolicitudPaseo.class))).thenAnswer(invocation -> {
+            SolicitudPaseo sp = invocation.getArgument(0);
+            sp.setId(900L);
+            return sp;
+        });
+
+        when(solicitudPaseoRepository.findByUuidWithDetails(anyString())).thenAnswer(invocation -> {
+            String uuid = invocation.getArgument(0);
+            return SolicitudPaseo.builder()
+                    .id(900L)
+                    .uuid(uuid)
+                    .codigoReserva("PAS-PROG-202610-XYZ1")
+                    .tipoModalidadPaseo(TipoModalidadPaseo.builder().id(Constant.ID_MODALIDAD_PROGRAMADO).descripcion("PROGRAMADO").build())
+                    .tipoMetodoPago(TipoMetodoPago.builder().id(1).descripcion("YAPE / PLIN").build())
+                    .tipoDuracionPaseo(duracion60Min)
+                    .bloqueHorario(bloque)
+                    .fechaProgramada(fechaFutura)
+                    .solicitudPaseoEstado(SolicitudPaseoEstado.builder().id(Constant.ID_ESTADO_SOLICITUD_PENDIENTE).descripcion("PENDIENTE").build())
+                    .distrito(DistritoLima.builder().id(21).descripcion("MIRAFLORES").build())
+                    .direccionRecojo("Av. José Pardo 123")
+                    .tarifaHoraPenSnapshot(new BigDecimal("25.00"))
+                    .montoTotal(new BigDecimal("50.00")) // (25 / 60) * 60 * 2 = 50.00
+                    .cliente(cliente)
+                    .paseador(paseador)
+                    .creadoEl(LocalDateTime.now())
+                    .build();
+        });
+
+        SolicitudPaseoResDto result = service.crearSolicitudProgramada("cliente@paseape.com", req);
+
+        assertNotNull(result);
+        assertEquals("PAS-PROG-202610-XYZ1", result.getCodigoReserva());
+        assertEquals(Constant.ID_MODALIDAD_PROGRAMADO, result.getTipoModalidadPaseoId());
+        assertEquals(Constant.ID_ESTADO_SOLICITUD_PENDIENTE, result.getEstadoId());
+        assertEquals(new BigDecimal("50.00"), result.getMontoTotal());
+        assertEquals(paseador.getUuid(), result.getPaseadorUuid());
+        assertEquals("Luis García", result.getPaseadorNombreCompleto());
+        assertEquals(cliente.getUuid(), result.getClienteUuid());
+        assertEquals("Carlos Mendoza", result.getClienteNombreCompleto());
+        assertEquals(2, result.getMascotas().size());
+
+        verify(solicitudPaseoRepository, times(1)).save(any(SolicitudPaseo.class));
+        verify(solicitudPaseoMascotaRepository, times(1)).saveAll(anyList());
+
+        ArgumentCaptor<Notificacion> notifCaptor = ArgumentCaptor.forClass(Notificacion.class);
+        verify(notificacionRepository, times(1)).save(notifCaptor.capture());
+        Notificacion notif = notifCaptor.getValue();
+        assertEquals(Constant.ID_TIPO_NOTIFICACION_SOLICITUD_RECIBIDA, notif.getTipoNotificacion().getId());
+        assertEquals(paseadorUsuario.getId(), notif.getDestinatarioUsuario().getId());
+        assertEquals(clienteUsuario.getId(), notif.getRemitenteUsuario().getId());
+        assertTrue(notif.getTitulo().contains("recibida"));
+    }
+
+    @Test
+    @DisplayName("crearSolicitudProgramada - Éxito con 2 bloques consecutivos (90 min)")
+    void testCrearSolicitudProgramada_Exito_2Bloques() throws BadRequestException {
+        LocalDate fechaFutura = LocalDate.now(ZoneId.of("America/Lima")).plusDays(2);
+        BloqueHorario bloque1 = BloqueHorario.builder().id(4).codigo("B09_10").orden(4).horaInicio(LocalTime.of(9, 0)).horaFin(LocalTime.of(10, 0)).build();
+        BloqueHorario bloque2 = BloqueHorario.builder().id(5).codigo("B10_11").orden(5).horaInicio(LocalTime.of(10, 0)).horaFin(LocalTime.of(11, 0)).build();
+
+        TipoDuracionPaseo duracion90Min = TipoDuracionPaseo.builder()
+                .id(3)
+                .descripcion("90 MINUTOS")
+                .minutos(90)
+                .bloquesRequeridos(2)
+                .build();
+
+        var req = CrearSolicitudProgramadaReqDto.builder()
+                .paseadorUuid(paseador.getUuid())
+                .mascotaUuids(List.of(mascota1.getUuid()))
+                .distritoId(21)
+                .fechaProgramada(fechaFutura)
+                .bloqueHorarioId(4)
+                .tipoDuracionPaseoId(3)
+                .tipoMetodoPagoId(1)
+                .direccionRecojo("Av. Larco 456")
+                .build();
+
+        when(usuarioRepository.findByCorreo("cliente@paseape.com")).thenReturn(clienteUsuario);
+        when(clienteRepository.findByUsuarioId(10L)).thenReturn(cliente);
+        when(mascotaRepository.findByUuid(mascota1.getUuid())).thenReturn(mascota1);
+        when(paseadorRepository.findByUuid(paseador.getUuid())).thenReturn(paseador);
+        when(bloqueHorarioRepository.findById(4)).thenReturn(bloque1);
+        when(bloqueHorarioRepository.findByOrden(5)).thenReturn(bloque2);
+        when(tipoDuracionPaseoRepository.findById(3)).thenReturn(duracion90Min);
+
+        int numDia = fechaFutura.getDayOfWeek().getValue();
+        when(diaSemanaRepository.findByNumeroDia(numDia)).thenReturn(DiaSemana.builder().id(numDia).numeroDia(numDia).build());
+
+        DisponibilidadPaseador disp1 = DisponibilidadPaseador.builder().id(51L).paseadorId(paseador.getId()).diaSemanaId(numDia).bloqueHorarioId(4).maxMascotas(3).estado(true).build();
+        DisponibilidadPaseador disp2 = DisponibilidadPaseador.builder().id(52L).paseadorId(paseador.getId()).diaSemanaId(numDia).bloqueHorarioId(5).maxMascotas(3).estado(true).build();
+
+        when(disponibilidadPaseadorRepository.findByPaseadorIdAndDiaSemanaIdAndBloqueHorarioId(2L, numDia, 4)).thenReturn(disp1);
+        when(disponibilidadPaseadorRepository.findByPaseadorIdAndDiaSemanaIdAndBloqueHorarioId(2L, numDia, 5)).thenReturn(disp2);
+
+        when(solicitudPaseoRepository.countMascotasOcupadas(eq(2L), eq(fechaFutura), eq(4), anyList())).thenReturn(0);
+        when(solicitudPaseoRepository.countMascotasOcupadas(eq(2L), eq(fechaFutura), eq(5), anyList())).thenReturn(1); // 1 ocupada + 1 nueva <= 3
+
+        when(solicitudPaseoRepository.save(any(SolicitudPaseo.class))).thenAnswer(invocation -> {
+            SolicitudPaseo sp = invocation.getArgument(0);
+            sp.setId(901L);
+            return sp;
+        });
+
+        SolicitudPaseoResDto result = service.crearSolicitudProgramada("cliente@paseape.com", req);
+
+        assertNotNull(result);
+        verify(solicitudPaseoRepository, times(1)).save(any(SolicitudPaseo.class));
+        verify(solicitudPaseoMascotaRepository, times(1)).saveAll(anyList());
+    }
+
+    @Test
+    @DisplayName("crearSolicitudProgramada - Falla si fecha programada es anterior a hoy en Lima")
+    void testCrearSolicitudProgramada_FalloFechaPasada() {
+        LocalDate fechaPasada = LocalDate.now(ZoneId.of("America/Lima")).minusDays(1);
+        var req = CrearSolicitudProgramadaReqDto.builder()
+                .paseadorUuid(paseador.getUuid())
+                .mascotaUuids(List.of(mascota1.getUuid()))
+                .distritoId(21)
+                .fechaProgramada(fechaPasada)
+                .bloqueHorarioId(5)
+                .tipoDuracionPaseoId(2)
+                .tipoMetodoPagoId(1)
+                .direccionRecojo("Av. Larco 456")
+                .build();
+
+        when(usuarioRepository.findByCorreo("cliente@paseape.com")).thenReturn(clienteUsuario);
+        when(clienteRepository.findByUsuarioId(10L)).thenReturn(cliente);
+        when(mascotaRepository.findByUuid(mascota1.getUuid())).thenReturn(mascota1);
+        when(paseadorRepository.findByUuid(paseador.getUuid())).thenReturn(paseador);
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () ->
+                service.crearSolicitudProgramada("cliente@paseape.com", req));
+
+        assertEquals(MessageCodes.ResponseCodeBR01, ex.code);
+        assertTrue(ex.getMessage().contains("anterior a la fecha actual"));
+    }
+
+    @Test
+    @DisplayName("crearSolicitudProgramada - Falla si es hoy y el bloque horario ya transcurrió")
+    void testCrearSolicitudProgramada_FalloHoraPasadaMismoDia() {
+        LocalDate hoyLima = LocalDate.now(ZoneId.of("America/Lima"));
+        LocalTime horaPasada = LocalTime.now(ZoneId.of("America/Lima")).minusHours(2);
+        BloqueHorario bloquePasado = BloqueHorario.builder()
+                .id(1)
+                .codigo("B06_07")
+                .orden(1)
+                .horaInicio(horaPasada)
+                .horaFin(horaPasada.plusHours(1))
+                .build();
+
+        var req = CrearSolicitudProgramadaReqDto.builder()
+                .paseadorUuid(paseador.getUuid())
+                .mascotaUuids(List.of(mascota1.getUuid()))
+                .distritoId(21)
+                .fechaProgramada(hoyLima)
+                .bloqueHorarioId(1)
+                .tipoDuracionPaseoId(2)
+                .tipoMetodoPagoId(1)
+                .direccionRecojo("Av. Larco 456")
+                .build();
+
+        when(usuarioRepository.findByCorreo("cliente@paseape.com")).thenReturn(clienteUsuario);
+        when(clienteRepository.findByUsuarioId(10L)).thenReturn(cliente);
+        when(mascotaRepository.findByUuid(mascota1.getUuid())).thenReturn(mascota1);
+        when(paseadorRepository.findByUuid(paseador.getUuid())).thenReturn(paseador);
+        when(bloqueHorarioRepository.findById(1)).thenReturn(bloquePasado);
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () ->
+                service.crearSolicitudProgramada("cliente@paseape.com", req));
+
+        assertEquals(MessageCodes.ResponseCodeBR01, ex.code);
+        assertTrue(ex.getMessage().contains("ya inició o ha transcurrido"));
+    }
+
+    @Test
+    @DisplayName("crearSolicitudProgramada - Falla si paseador no existe")
+    void testCrearSolicitudProgramada_FalloPaseadorNoExiste() {
+        String uuidInexistente = UUID.randomUUID().toString();
+        var req = CrearSolicitudProgramadaReqDto.builder()
+                .paseadorUuid(uuidInexistente)
+                .mascotaUuids(List.of(mascota1.getUuid()))
+                .distritoId(21)
+                .fechaProgramada(LocalDate.now().plusDays(2))
+                .bloqueHorarioId(5)
+                .tipoDuracionPaseoId(2)
+                .tipoMetodoPagoId(1)
+                .direccionRecojo("Av. Larco 456")
+                .build();
+
+        when(usuarioRepository.findByCorreo("cliente@paseape.com")).thenReturn(clienteUsuario);
+        when(clienteRepository.findByUsuarioId(10L)).thenReturn(cliente);
+        when(mascotaRepository.findByUuid(mascota1.getUuid())).thenReturn(mascota1);
+        when(paseadorRepository.findByUuid(uuidInexistente)).thenReturn(null);
+        when(usuarioRepository.findByUuid(uuidInexistente)).thenReturn(null);
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () ->
+                service.crearSolicitudProgramada("cliente@paseape.com", req));
+
+        assertEquals(MessageCodes.ResponseCodeBR98, ex.code);
+        assertTrue(ex.getMessage().contains("especificado no existe"));
+    }
+
+    @Test
+    @DisplayName("crearSolicitudProgramada - Falla si paseador no está verificado y aprobado")
+    void testCrearSolicitudProgramada_FalloPaseadorNoAprobado() {
+        Paseador paseadorPendiente = Paseador.builder()
+                .id(99L)
+                .uuid(UUID.randomUUID().toString())
+                .distritoCobertura(new DistritoLima(21))
+                .tarifaHoraPen(new BigDecimal("20.00"))
+                .estadoVerificacion(PaseadorEstadoVerificacion.builder().id(Constant.ID_PENDIENTE).descripcion("PENDIENTE").build())
+                .estado(Constant.ESTADO_LOGICO_ACTIVO)
+                .build();
+
+        var req = CrearSolicitudProgramadaReqDto.builder()
+                .paseadorUuid(paseadorPendiente.getUuid())
+                .mascotaUuids(List.of(mascota1.getUuid()))
+                .distritoId(21)
+                .fechaProgramada(LocalDate.now().plusDays(2))
+                .bloqueHorarioId(5)
+                .tipoDuracionPaseoId(2)
+                .tipoMetodoPagoId(1)
+                .direccionRecojo("Av. Larco 456")
+                .build();
+
+        when(usuarioRepository.findByCorreo("cliente@paseape.com")).thenReturn(clienteUsuario);
+        when(clienteRepository.findByUsuarioId(10L)).thenReturn(cliente);
+        when(mascotaRepository.findByUuid(mascota1.getUuid())).thenReturn(mascota1);
+        when(paseadorRepository.findByUuid(paseadorPendiente.getUuid())).thenReturn(paseadorPendiente);
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () ->
+                service.crearSolicitudProgramada("cliente@paseape.com", req));
+
+        assertEquals(MessageCodes.ResponseCodeBR03, ex.code);
+        assertTrue(ex.getMessage().contains("verificado y aprobado"));
+    }
+
+    @Test
+    @DisplayName("crearSolicitudProgramada - Falla si distrito no coincide con cobertura del paseador")
+    void testCrearSolicitudProgramada_FalloDistritoNoCobertura() {
+        var req = CrearSolicitudProgramadaReqDto.builder()
+                .paseadorUuid(paseador.getUuid())
+                .mascotaUuids(List.of(mascota1.getUuid()))
+                .distritoId(31) // San Isidro
+                .fechaProgramada(LocalDate.now().plusDays(2))
+                .bloqueHorarioId(5)
+                .tipoDuracionPaseoId(2)
+                .tipoMetodoPagoId(1)
+                .direccionRecojo("Av. Javier Prado 123")
+                .build();
+
+        when(usuarioRepository.findByCorreo("cliente@paseape.com")).thenReturn(clienteUsuario);
+        when(clienteRepository.findByUsuarioId(10L)).thenReturn(cliente);
+        when(mascotaRepository.findByUuid(mascota1.getUuid())).thenReturn(mascota1);
+        when(paseadorRepository.findByUuid(paseador.getUuid())).thenReturn(paseador);
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () ->
+                service.crearSolicitudProgramada("cliente@paseape.com", req));
+
+        assertEquals(MessageCodes.ResponseCodeBR03, ex.code);
+        assertTrue(ex.getMessage().contains("no coincide con la zona de cobertura"));
+    }
+
+    @Test
+    @DisplayName("crearSolicitudProgramada - Falla si no hay bloque consecutivo para duración de 2 bloques")
+    void testCrearSolicitudProgramada_FalloSinBloqueConsecutivo() {
+        LocalDate fechaFutura = LocalDate.now(ZoneId.of("America/Lima")).plusDays(2);
+        BloqueHorario ultimoBloque = BloqueHorario.builder().id(17).codigo("B22_23").orden(17).horaInicio(LocalTime.of(22, 0)).build();
+        TipoDuracionPaseo duracion120Min = TipoDuracionPaseo.builder().id(4).minutos(120).bloquesRequeridos(2).build();
+
+        var req = CrearSolicitudProgramadaReqDto.builder()
+                .paseadorUuid(paseador.getUuid())
+                .mascotaUuids(List.of(mascota1.getUuid()))
+                .distritoId(21)
+                .fechaProgramada(fechaFutura)
+                .bloqueHorarioId(17)
+                .tipoDuracionPaseoId(4)
+                .tipoMetodoPagoId(1)
+                .direccionRecojo("Av. Larco 456")
+                .build();
+
+        when(usuarioRepository.findByCorreo("cliente@paseape.com")).thenReturn(clienteUsuario);
+        when(clienteRepository.findByUsuarioId(10L)).thenReturn(cliente);
+        when(mascotaRepository.findByUuid(mascota1.getUuid())).thenReturn(mascota1);
+        when(paseadorRepository.findByUuid(paseador.getUuid())).thenReturn(paseador);
+        when(bloqueHorarioRepository.findById(17)).thenReturn(ultimoBloque);
+        when(tipoDuracionPaseoRepository.findById(4)).thenReturn(duracion120Min);
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () ->
+                service.crearSolicitudProgramada("cliente@paseape.com", req));
+
+        assertEquals(MessageCodes.ResponseCodeBR03, ex.code);
+        assertTrue(ex.getMessage().contains("consecutivo disponible"));
+    }
+
+    @Test
+    @DisplayName("crearSolicitudProgramada - Falla si el paseador no tiene disponibilidad activa en el bloque")
+    void testCrearSolicitudProgramada_FalloSinDisponibilidadPaseador() {
+        LocalDate fechaFutura = LocalDate.now(ZoneId.of("America/Lima")).plusDays(2);
+        BloqueHorario bloque = BloqueHorario.builder().id(5).codigo("B10_11").orden(5).horaInicio(LocalTime.of(10, 0)).build();
+
+        var req = CrearSolicitudProgramadaReqDto.builder()
+                .paseadorUuid(paseador.getUuid())
+                .mascotaUuids(List.of(mascota1.getUuid()))
+                .distritoId(21)
+                .fechaProgramada(fechaFutura)
+                .bloqueHorarioId(5)
+                .tipoDuracionPaseoId(2)
+                .tipoMetodoPagoId(1)
+                .direccionRecojo("Av. Larco 456")
+                .build();
+
+        when(usuarioRepository.findByCorreo("cliente@paseape.com")).thenReturn(clienteUsuario);
+        when(clienteRepository.findByUsuarioId(10L)).thenReturn(cliente);
+        when(mascotaRepository.findByUuid(mascota1.getUuid())).thenReturn(mascota1);
+        when(paseadorRepository.findByUuid(paseador.getUuid())).thenReturn(paseador);
+        when(bloqueHorarioRepository.findById(5)).thenReturn(bloque);
+        when(tipoDuracionPaseoRepository.findById(2)).thenReturn(duracion60Min);
+
+        int numDia = fechaFutura.getDayOfWeek().getValue();
+        when(diaSemanaRepository.findByNumeroDia(numDia)).thenReturn(DiaSemana.builder().id(numDia).numeroDia(numDia).build());
+        when(disponibilidadPaseadorRepository.findByPaseadorIdAndDiaSemanaIdAndBloqueHorarioId(2L, numDia, 5)).thenReturn(null);
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () ->
+                service.crearSolicitudProgramada("cliente@paseape.com", req));
+
+        assertEquals(MessageCodes.ResponseCodeBR03, ex.code);
+        assertTrue(ex.getMessage().contains("no tiene disponibilidad activa"));
+    }
+
+    @Test
+    @DisplayName("crearSolicitudProgramada - Falla si el cupo del bloque está agotado")
+    void testCrearSolicitudProgramada_FalloCupoAgotado() {
+        LocalDate fechaFutura = LocalDate.now(ZoneId.of("America/Lima")).plusDays(2);
+        BloqueHorario bloque = BloqueHorario.builder().id(5).codigo("B10_11").orden(5).horaInicio(LocalTime.of(10, 0)).build();
+
+        var req = CrearSolicitudProgramadaReqDto.builder()
+                .paseadorUuid(paseador.getUuid())
+                .mascotaUuids(List.of(mascota1.getUuid(), mascota2.getUuid())) // 2 mascotas solicitadas
+                .distritoId(21)
+                .fechaProgramada(fechaFutura)
+                .bloqueHorarioId(5)
+                .tipoDuracionPaseoId(2)
+                .tipoMetodoPagoId(1)
+                .direccionRecojo("Av. Larco 456")
+                .build();
+
+        when(usuarioRepository.findByCorreo("cliente@paseape.com")).thenReturn(clienteUsuario);
+        when(clienteRepository.findByUsuarioId(10L)).thenReturn(cliente);
+        when(mascotaRepository.findByUuid(mascota1.getUuid())).thenReturn(mascota1);
+        when(mascotaRepository.findByUuid(mascota2.getUuid())).thenReturn(mascota2);
+        when(paseadorRepository.findByUuid(paseador.getUuid())).thenReturn(paseador);
+        when(bloqueHorarioRepository.findById(5)).thenReturn(bloque);
+        when(tipoDuracionPaseoRepository.findById(2)).thenReturn(duracion60Min);
+
+        int numDia = fechaFutura.getDayOfWeek().getValue();
+        when(diaSemanaRepository.findByNumeroDia(numDia)).thenReturn(DiaSemana.builder().id(numDia).numeroDia(numDia).build());
+
+        DisponibilidadPaseador disp = DisponibilidadPaseador.builder()
+                .id(50L)
+                .paseadorId(2L)
+                .diaSemanaId(numDia)
+                .bloqueHorarioId(5)
+                .maxMascotas(3)
+                .estado(true)
+                .build();
+
+        when(disponibilidadPaseadorRepository.findByPaseadorIdAndDiaSemanaIdAndBloqueHorarioId(2L, numDia, 5)).thenReturn(disp);
+        when(solicitudPaseoRepository.countMascotasOcupadas(eq(2L), eq(fechaFutura), eq(5), anyList())).thenReturn(2); // 2 ocupadas + 2 nuevas = 4 > 3
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () ->
+                service.crearSolicitudProgramada("cliente@paseape.com", req));
+
+        assertEquals(MessageCodes.ResponseCodeBR03, ex.code);
+        assertTrue(ex.getMessage().contains("no cuenta con cupo suficiente"));
     }
 
     @Test

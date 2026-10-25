@@ -10,6 +10,8 @@ public interface IBloqueHorarioRepository {
 
     BloqueHorario findByCodigo(String codigo);
 
+    BloqueHorario findByOrden(Integer orden);
+
     List<BloqueHorario> findAll();
 
     List<BloqueHorario> findAllByEstado(Boolean estado);

@@ -37,6 +37,15 @@ public class BloqueHorarioRepository implements IBloqueHorarioRepository {
     }
 
     @Override
+    public BloqueHorario findByOrden(Integer orden) {
+        if (orden == null) {
+            return null;
+        }
+        BloqueHorarioEntity entity = jpaRepository.findByOrden(orden);
+        return entity != null ? mapper.toDomain(entity) : null;
+    }
+
+    @Override
     public List<BloqueHorario> findAll() {
         List<BloqueHorarioEntity> entities = jpaRepository.findAll();
         return mapper.toDomainList(entities);
