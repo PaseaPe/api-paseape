@@ -42,4 +42,6 @@ public interface ISolicitudPaseoRepository {
     Page<SolicitudPaseo> findByPaseadorIdAndEstadosPaginado(Long paseadorId, List<Integer> estadosIds, Pageable pageable);
 
     int expirarSolicitudesInmediatasVencidas(Integer modalidadInmediatoId, Integer estadoBuscandoId, Integer estadoVencidaId, LocalDateTime ahora);
+
+    Page<SolicitudPaseo> findByClienteIdAndEstadosPaginado(Long clienteId, List<Integer> estados, Pageable pageable);
 }

@@ -271,4 +271,17 @@ public class Constant {
     public static final String TITULO_NOTIF_SOLICITUD_PROGRAMADA_RECHAZADA = "Actualización de tu solicitud de paseo programado";
     public static final String TITULO_NOTIF_SOLICITUD_CANCELADA_PASEADOR = "Paseo cancelado por el paseador";
     public static final String MOTIVO_RECHAZO_DEFAULT = "Solicitud declinada por el paseador";
+
+    // =========================================================================
+    // BANDEJA CLIENTE (TABS HU21)
+    // =========================================================================
+    public static final String TAB_CLIENTE_ACTIVOS = "ACTIVOS";
+    public static final String TAB_CLIENTE_PENDIENTES = "PENDIENTES";
+    public static final String TAB_CLIENTE_HISTORIAL = "HISTORIAL";
+
+    public static final String MSJ_BANDEJA_CLIENTE_OBTENIDA = "Bandeja de solicitudes del cliente obtenida exitosamente";
+    public static final String MSJ_ERROR_TAB_CLIENTE_INVALIDO = "El parámetro 'tab' no es válido. Valores permitidos: ACTIVOS, PENDIENTES, HISTORIAL.";
+    public static final String MSJ_SOLICITUD_CANCELADA_CLIENTE_EXITO = "Paseo cancelado exitosamente por el cliente";
+    public static final String MSJ_ERROR_SOLICITUD_EN_CURSO_NO_CANCELABLE = "No se puede cancelar un paseo que ya se encuentra en curso.";
+    public static final String TITULO_NOTIF_SOLICITUD_CANCELADA_CLIENTE = "Paseo cancelado por el cliente";
 }

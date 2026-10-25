@@ -183,4 +183,11 @@ public interface ISolicitudPaseoJpaRepository extends JpaRepository<SolicitudPas
             @Param("estadoVencidaId") Integer estadoVencidaId,
             @Param("ahora") LocalDateTime ahora
     );
+
+    @Query("SELECT s FROM SolicitudPaseoEntity s WHERE s.cliente.id = :clienteId AND s.solicitudPaseoEstado.id IN (:estados)")
+    Page<SolicitudPaseoEntity> findByClienteIdAndEstadosPaginado(
+            @Param("clienteId") Long clienteId,
+            @Param("estados") List<Integer> estados,
+            Pageable pageable
+    );
 }

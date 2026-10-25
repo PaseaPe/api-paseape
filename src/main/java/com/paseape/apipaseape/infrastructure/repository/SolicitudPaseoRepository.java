@@ -193,4 +193,10 @@ public class SolicitudPaseoRepository implements ISolicitudPaseoRepository {
         }
         return jpaRepository.expirarSolicitudesInmediatasVencidas(modalidadInmediatoId, estadoBuscandoId, estadoVencidaId, ahora);
     }
+
+    @Override
+    public Page<SolicitudPaseo> findByClienteIdAndEstadosPaginado(Long clienteId, List<Integer> estados, Pageable pageable) {
+        Page<SolicitudPaseoEntity> entities = jpaRepository.findByClienteIdAndEstadosPaginado(clienteId, estados, pageable);
+        return entities.map(mapper::toDomain);
+    }
 }

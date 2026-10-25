@@ -871,6 +871,201 @@ public class SolicitudPaseoService {
         return solicitudPaseoDtoMapper.toResDto(guardada, mascotas);
     }
 
+    @Transactional(readOnly = true)
+    public PageResponseDto<SolicitudPaseoResDto> obtenerBandejaCliente(String userEmail, String tab, int page, int size) throws BadRequestException {
+        if (userEmail == null || userEmail.trim().isEmpty()) {
+            throw new BadRequestException(MessageCodes.ResponseCodeE01, "Usuario no autenticado.");
+        }
+
+        Usuario usuario = usuarioRepository.findByCorreo(userEmail.trim().toLowerCase());
+        if (usuario == null) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR98, "No se encontró el usuario autenticado.");
+        }
+
+        Cliente cliente = clienteRepository.findByUsuarioId(usuario.getId());
+        if (cliente == null) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR03, "El usuario no cuenta con un perfil de cliente registrado.");
+        }
+
+        if (cliente.getEstado() != null && cliente.getEstado() != Constant.ESTADO_LOGICO_ACTIVO) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR04, "El cliente no se encuentra activo.");
+        }
+
+        String tabUpper = tab != null ? tab.trim().toUpperCase() : Constant.TAB_CLIENTE_PENDIENTES;
+        Page<SolicitudPaseo> pageResult;
+
+        if (Constant.TAB_CLIENTE_ACTIVOS.equals(tabUpper)) {
+            List<Integer> estados = List.of(Constant.ID_ESTADO_SOLICITUD_EN_CURSO);
+            Pageable pageable = PageRequest.of(
+                    page,
+                    size,
+                    Sort.by(Sort.Direction.DESC, "fechaHoraInicioReal")
+                            .and(Sort.by(Sort.Direction.DESC, "creadoEl"))
+            );
+            pageResult = solicitudPaseoRepository.findByClienteIdAndEstadosPaginado(cliente.getId(), estados, pageable);
+        } else if (Constant.TAB_CLIENTE_PENDIENTES.equals(tabUpper)) {
+            List<Integer> estados = List.of(
+                    Constant.ID_ESTADO_SOLICITUD_BUSCANDO,
+                    Constant.ID_ESTADO_SOLICITUD_PENDIENTE,
+                    Constant.ID_ESTADO_SOLICITUD_ACEPTADA
+            );
+            Pageable pageable = PageRequest.of(
+                    page,
+                    size,
+                    Sort.by(Sort.Direction.ASC, "fechaProgramada")
+                            .and(Sort.by(Sort.Direction.DESC, "creadoEl"))
+            );
+            pageResult = solicitudPaseoRepository.findByClienteIdAndEstadosPaginado(cliente.getId(), estados, pageable);
+        } else if (Constant.TAB_CLIENTE_HISTORIAL.equals(tabUpper)) {
+            List<Integer> estados = List.of(
+                    Constant.ID_ESTADO_SOLICITUD_RECHAZADA,
+                    Constant.ID_ESTADO_SOLICITUD_CANCELADA,
+                    Constant.ID_ESTADO_SOLICITUD_FINALIZADA,
+                    Constant.ID_ESTADO_SOLICITUD_VENCIDA
+            );
+            Pageable pageable = PageRequest.of(
+                    page,
+                    size,
+                    Sort.by(Sort.Direction.DESC, "actualizadoEl")
+                            .and(Sort.by(Sort.Direction.DESC, "creadoEl"))
+            );
+            pageResult = solicitudPaseoRepository.findByClienteIdAndEstadosPaginado(cliente.getId(), estados, pageable);
+        } else {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR01, Constant.MSJ_ERROR_TAB_CLIENTE_INVALIDO);
+        }
+
+        List<SolicitudPaseo> content = pageResult.getContent();
+        if (content.isEmpty()) {
+            return PageResponseDto.<SolicitudPaseoResDto>builder()
+                    .items(List.of())
+                    .page(pageResult.getNumber())
+                    .size(pageResult.getSize())
+                    .totalElements(pageResult.getTotalElements())
+                    .totalPages(pageResult.getTotalPages())
+                    .isFirst(pageResult.isFirst())
+                    .isLast(pageResult.isLast())
+                    .hasNext(pageResult.hasNext())
+                    .hasPrevious(pageResult.hasPrevious())
+                    .build();
+        }
+
+        List<Long> solicitudIds = content.stream().map(SolicitudPaseo::getId).toList();
+        List<SolicitudPaseoMascota> todasMascotas = solicitudPaseoMascotaRepository.findAllBySolicitudPaseoIdInWithDetails(solicitudIds);
+        Map<Long, List<SolicitudPaseoMascota>> mascotasPorSolicitud = todasMascotas.stream()
+                .filter(spm -> spm.getSolicitudPaseo() != null && spm.getSolicitudPaseo().getId() != null)
+                .collect(Collectors.groupingBy(spm -> spm.getSolicitudPaseo().getId()));
+
+        List<SolicitudPaseoResDto> dtoList = content.stream()
+                .map(s -> {
+                    List<SolicitudPaseoMascota> mascotas = mascotasPorSolicitud.getOrDefault(s.getId(), List.of());
+                    return solicitudPaseoDtoMapper.toResDto(s, mascotas);
+                })
+                .toList();
+
+        return PageResponseDto.<SolicitudPaseoResDto>builder()
+                .items(dtoList)
+                .page(pageResult.getNumber())
+                .size(pageResult.getSize())
+                .totalElements(pageResult.getTotalElements())
+                .totalPages(pageResult.getTotalPages())
+                .isFirst(pageResult.isFirst())
+                .isLast(pageResult.isLast())
+                .hasNext(pageResult.hasNext())
+                .hasPrevious(pageResult.hasPrevious())
+                .build();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public SolicitudPaseoResDto cancelarSolicitudCliente(String userEmail, String solicitudUuid, CancelarSolicitudReqDto reqDto) throws BadRequestException {
+        if (userEmail == null || userEmail.trim().isEmpty()) {
+            throw new BadRequestException(MessageCodes.ResponseCodeE01, "Usuario no autenticado.");
+        }
+
+        Usuario usuario = usuarioRepository.findByCorreo(userEmail.trim().toLowerCase());
+        if (usuario == null) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR98, "No se encontró el usuario autenticado.");
+        }
+
+        Cliente cliente = clienteRepository.findByUsuarioId(usuario.getId());
+        if (cliente == null) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR03, "El usuario no cuenta con un perfil de cliente registrado.");
+        }
+
+        if (cliente.getEstado() != null && cliente.getEstado() != Constant.ESTADO_LOGICO_ACTIVO) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR04, "El cliente no se encuentra activo.");
+        }
+
+        SolicitudPaseo solicitud = solicitudPaseoRepository.findByUuidWithDetails(solicitudUuid.trim());
+        if (solicitud == null) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR98, "No se encontró la solicitud de paseo.");
+        }
+
+        if (solicitud.getCliente() == null || !cliente.getId().equals(solicitud.getCliente().getId())) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR03, "La solicitud no pertenece al cliente autenticado.");
+        }
+
+        if (solicitud.getSolicitudPaseoEstado() == null) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR03, Constant.MSJ_ERROR_SOLICITUD_NO_CANCELABLE);
+        }
+
+        int estadoId = solicitud.getSolicitudPaseoEstado().getId();
+
+        if (estadoId == Constant.ID_ESTADO_SOLICITUD_EN_CURSO || solicitud.getFechaHoraInicioReal() != null) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR03, Constant.MSJ_ERROR_SOLICITUD_EN_CURSO_NO_CANCELABLE);
+        }
+
+        if (estadoId == Constant.ID_ESTADO_SOLICITUD_RECHAZADA ||
+                estadoId == Constant.ID_ESTADO_SOLICITUD_CANCELADA ||
+                estadoId == Constant.ID_ESTADO_SOLICITUD_FINALIZADA ||
+                estadoId == Constant.ID_ESTADO_SOLICITUD_VENCIDA) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR03, Constant.MSJ_ERROR_SOLICITUD_NO_CANCELABLE);
+        }
+
+        String motivo = (reqDto != null && StringUtils.hasText(reqDto.getMotivo()))
+                ? reqDto.getMotivo().trim()
+                : null;
+
+        if (estadoId == Constant.ID_ESTADO_SOLICITUD_ACEPTADA) {
+            if (motivo == null || motivo.length() < 10) {
+                throw new BadRequestException(MessageCodes.ResponseCodeBR01, Constant.MSJ_ERROR_MOTIVO_CANCELACION_OBLIGATORIO);
+            }
+        }
+
+        solicitud.setSolicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_CANCELADA));
+        solicitud.setMotivoRechazoCancelacion(motivo);
+        SolicitudPaseo guardada = solicitudPaseoRepository.save(solicitud);
+
+        if (guardada.getPaseador() != null && guardada.getPaseador().getUsuario() != null) {
+            Usuario destinatarioPaseador = guardada.getPaseador().getUsuario();
+            String nombreCliente = obtenerNombreCompletoCliente(usuario, cliente);
+            Notificacion notificacion = Notificacion.builder()
+                    .uuid(UUID.randomUUID().toString())
+                    .remitenteUsuario(usuario)
+                    .destinatarioUsuario(destinatarioPaseador)
+                    .tipoNotificacion(new TipoNotificacion(Constant.ID_TIPO_NOTIFICACION_SOLICITUD_CANCELADA))
+                    .titulo(Constant.TITULO_NOTIF_SOLICITUD_CANCELADA_CLIENTE)
+                    .mensaje("El cliente " + nombreCliente + " ha cancelado el paseo con código " + guardada.getCodigoReserva() + ".")
+                    .referenciaId(guardada.getId())
+                    .referenciaTipo(Constant.REFERENCIA_TIPO_SOLICITUD_PASEO)
+                    .leido(false)
+                    .fechaLeido(null)
+                    .estado(1)
+                    .build();
+            notificacionRepository.save(notificacion);
+        }
+
+        List<SolicitudPaseoMascota> mascotas = solicitudPaseoMascotaRepository.findAllBySolicitudPaseoIdWithDetails(guardada.getId());
+        return solicitudPaseoDtoMapper.toResDto(guardada, mascotas);
+    }
+
+    private String obtenerNombreCompletoCliente(Usuario usuario, Cliente cliente) {
+        if (usuario != null && StringUtils.hasText(usuario.getNombres())) {
+            String apellidos = StringUtils.hasText(usuario.getApellidos()) ? " " + usuario.getApellidos().trim() : "";
+            return usuario.getNombres().trim() + apellidos;
+        }
+        return "Cliente";
+    }
+
     private String obtenerNombreCompletoPaseador(Usuario usuario, Paseador paseador) {
         String paseadorNombre = "";
         if (usuario != null && usuario.getNombres() != null) {

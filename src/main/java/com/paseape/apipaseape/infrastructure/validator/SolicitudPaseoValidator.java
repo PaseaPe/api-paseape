@@ -154,6 +154,32 @@ public class SolicitudPaseoValidator {
         return null;
     }
 
+    public ErrorDetailDto validarConsultaBandejaCliente(String tab, Integer page, Integer size) {
+        if (!StringUtils.hasText(tab)) {
+            return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El parámetro 'tab' es estrictamente obligatorio.");
+        }
+        String tabUpper = tab.trim().toUpperCase();
+        if (!Constant.TAB_CLIENTE_ACTIVOS.equals(tabUpper) &&
+                !Constant.TAB_CLIENTE_PENDIENTES.equals(tabUpper) &&
+                !Constant.TAB_CLIENTE_HISTORIAL.equals(tabUpper)) {
+            return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, Constant.MSJ_ERROR_TAB_CLIENTE_INVALIDO);
+        }
+        if (page == null || page < 0) {
+            return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El número de página no puede ser negativo.");
+        }
+        if (size == null || size < 1 || size > Constant.SIZE_MAXIMO) {
+            return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El tamaño de página debe estar entre 1 y " + Constant.SIZE_MAXIMO + ".");
+        }
+        return null;
+    }
+
+    public ErrorDetailDto validarCancelarSolicitudCliente(CancelarSolicitudReqDto reqDto) {
+        if (reqDto != null && StringUtils.hasText(reqDto.getMotivo()) && reqDto.getMotivo().trim().length() > 500) {
+            return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El motivo de cancelación no debe superar los 500 caracteres.");
+        }
+        return null;
+    }
+
     public ErrorDetailDto validarConsultaBandejaPaseador(String tab, Integer page, Integer size) {
         if (!StringUtils.hasText(tab)) {
             return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El parámetro 'tab' es estrictamente obligatorio.");

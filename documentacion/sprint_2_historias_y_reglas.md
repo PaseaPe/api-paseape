@@ -288,20 +288,69 @@ El Sprint 2 tiene como objetivo habilitar el núcleo operativo y transaccional d
 ---
 
 ### J. HU21 – Consultar y Gestionar Estados de la Solicitud (COMPLETADA)
-* **Objetivo:** Permitir consultar las solicitudes según su estado operativo y ejecutar las transiciones de estado correspondientes con validaciones de negocio y notificaciones automáticas.
+* **Objetivo:** Permitir tanto al paseador como al cliente consultar sus solicitudes según su ciclo operativo mediante bandejas unificadas paginadas por pestañas especializadas, y ejecutar las transiciones de estado correspondientes con validaciones rigurosas de negocio, control de motivos condicionales y emisión de notificaciones automáticas.
 * **Cómo se desarrolló:**
-  1. **Endpoints de Consulta (`SolicitudPaseoPaseadorController`):**
-     * `GET /api-paseape/paseador/solicitudes?tab={INMEDIATAS|MIS_PASEOS|EN_CURSO|HISTORIAL}&page=0&size=10`: Consulta paginada de solicitudes filtradas por pestaña operativa.
-     * `GET /api-paseape/paseador/solicitudes/disponibles`: Listado de solicitudes inmediatas en búsqueda activa dentro del distrito de cobertura del paseador.
-  2. **Endpoints de Transición de Estado (`SolicitudPaseoPaseadorController`):**
-     * `PATCH /api-paseape/paseador/solicitudes/{uuid}/tomar`: Adjudicación atómica de solicitud inmediata (`SOLICITADA_BUSCANDO` [8] ➔ `ACEPTADA` [2]), asigna el paseador, fija `fecha_hora_aceptada` y notifica al cliente (`SOLICITUD_ACEPTADA`).
-     * `PATCH /api-paseape/paseador/solicitudes/{uuid}/descartar`: Descarte individual de solicitud inmediata por parte del paseador en `solicitud_paseo_descarte`.
-     * `PATCH /api-paseape/paseador/solicitudes/{uuid}/aceptar`: Aceptación de solicitud programada (`PENDIENTE` [1] ➔ `ACEPTADA` [2]), registra `fecha_hora_aceptada = LocalDateTime.now()` y notifica al cliente (`SOLICITUD_ACEPTADA`).
-     * `PATCH /api-paseape/paseador/solicitudes/{uuid}/rechazar`: Rechazo de solicitud programada (`PENDIENTE` [1] ➔ `RECHAZADA` [3]) con `motivo_rechazo` opcional (`RechazarSolicitudReqDto`), libera el cupo del bloque horario y notifica al cliente (`SOLICITUD_RECHAZADA`).
-     * `PATCH /api-paseape/paseador/solicitudes/{uuid}/cancelar`: Cancelación por el paseador de un paseo previamente confirmado (`ACEPTADA` [2] ➔ `CANCELADA` [4]) antes de su inicio, validando `motivo` obligatorio entre 10 y 500 caracteres (`CancelarSolicitudReqDto`), liberando el cupo y notificando al cliente (`SOLICITUD_CANCELADA`).
-  3. **Transición Automática por Expiración (`AppTaskScheduler`):**
-     * Tarea programada cada 60 segundos (`expirarSolicitudesInmediatasVencidas`) que transiciona solicitudes inmediatas de `SOLICITADA_BUSCANDO` (8) a `VENCIDA` (7) cuando `hora_vencimiento <= LocalDateTime.now()`.
+    1. **Flujo Operativo del Paseador (`SolicitudPaseoPaseadorController`):**
+        * **Endpoints de Consulta:**
+            * `GET /api-paseape/paseador/solicitudes?tab={INMEDIATAS|MIS_PASEOS|EN_CURSO|HISTORIAL}&page=0&size=10`: Consulta paginada filtrada por pestaña operativa.
+            * `GET /api-paseape/paseador/solicitudes/disponibles`: Listado de solicitudes inmediatas en búsqueda activa dentro de su distrito de cobertura.
+        * **Endpoints de Transición de Estado:**
+            * `PATCH /api-paseape/paseador/solicitudes/{uuid}/tomar`: Adjudicación atómica de solicitud inmediata (`SOLICITADA_BUSCANDO` [8] ➔ `ACEPTADA` [2]), asigna el paseador, fija `fecha_hora_aceptada` y notifica al cliente (`SOLICITUD_ACEPTADA`).
+            * `PATCH /api-paseape/paseador/solicitudes/{uuid}/descartar`: Descarte individual de solicitud inmediata en `solicitud_paseo_descarte` sin afectar a otros paseadores.
+            * `PATCH /api-paseape/paseador/solicitudes/{uuid}/aceptar`: Aceptación de solicitud programada (`PENDIENTE` [1] ➔ `ACEPTADA` [2]), fija `fecha_hora_aceptada = LocalDateTime.now()` y notifica al cliente (`SOLICITUD_ACEPTADA`).
+            * `PATCH /api-paseape/paseador/solicitudes/{uuid}/rechazar`: Rechazo de solicitud programada (`PENDIENTE` [1] ➔ `RECHAZADA` [3]) con motivo opcional (`RechazarSolicitudReqDto`), libera cupos y notifica al cliente (`SOLICITUD_RECHAZADA`).
+            * `PATCH /api-paseape/paseador/solicitudes/{uuid}/cancelar`: Cancelación de paseo previamente confirmado (`ACEPTADA` [2] ➔ `CANCELADA` [4]) antes de su inicio, con motivo obligatorio de 10 a 500 caracteres (`CancelarSolicitudReqDto`), liberando cupos y notificando al cliente (`SOLICITUD_CANCELADA`).
 
+    2. **Flujo Operativo del Cliente – Bandeja "Mis Paseos" (`SolicitudPaseoClienteController`):**
+        * **Endpoint de Consulta Unificada:**
+            * `GET /api-paseape/cliente/solicitudes`: Endpoint paginado con query params:
+                * `tab`: (`ACTIVOS`, `PENDIENTES`, `HISTORIAL`, por defecto `PENDIENTES`).
+                * `page`: Número de página (0-indexed, default `0`).
+                * `size`: Tamaño de página (default `10`, máx `50`).
+                * Retorna la envoltura `ResponseDto<PageResponseDto<SolicitudPaseoResDto>>`.
+        * **Estructura de las 3 Pestañas del Cliente:**
+            * **Pestaña 1 - `ACTIVOS`:** Muestra únicamente los paseos que se encuentran en ejecución física en tiempo real (`solicitud_paseo_estado_id = 5 [EN_CURSO]`), ordenados por `fecha_hora_inicio_real DESC, creado_el DESC`.
+            * **Pestaña 2 - `PENDIENTES` (Pestaña por defecto):** Agrupa todas las solicitudes abiertas o pendientes de inicio:
+                * Inmediatas bajo demanda en búsqueda activa (`solicitud_paseo_estado_id = 8 [SOLICITADA_BUSCANDO]`).
+                * Programadas esperando confirmación del paseador (`solicitud_paseo_estado_id = 1 [PENDIENTE]`).
+                * Paseos (inmediatos o programados) ya aceptados por el paseador pendientes de iniciar el recorrido (`solicitud_paseo_estado_id = 2 [ACEPTADA]`).
+                * Criterio de ordenamiento: `fecha_programada ASC, creado_el DESC`.
+            * **Pestaña 3 - `HISTORIAL`:** Registro histórico consolidado de todas las solicitudes cerradas o terminales:
+                * Culminadas satisfactoriamente (`solicitud_paseo_estado_id = 6 [FINALIZADA]`).
+                * Canceladas por el cliente o el paseador (`solicitud_paseo_estado_id = 4 [CANCELADA]`).
+                * Rechazadas por el paseador (`solicitud_paseo_estado_id = 3 [RECHAZADA]`).
+                * Vencidas por inactividad (`solicitud_paseo_estado_id = 7 [VENCIDA]`).
+                * Criterio de ordenamiento: `actualizado_el DESC, creado_el DESC`.
+
+    3. **Flujo y Reglas de Negocio de Cancelación por el Cliente:**
+        * **Endpoint:** `PATCH /api-paseape/cliente/solicitudes/{uuid}/cancelar` con cuerpo `@RequestBody(required = false) CancelarSolicitudReqDto`.
+        * **Aislamiento Multitenant:** Comprueba que la solicitud pertenezca al cliente en sesión autenticada (`solicitud.getCliente().getId().equals(cliente.getId())`).
+        * **Regla de Cancelación Condicional según Estado de Aceptación:**
+            * **A. Solicitud NO Aceptada por el Paseador (`SOLICITADA_BUSCANDO` [8] o `PENDIENTE` [1]):**
+                * El cliente puede desistir libremente del servicio antes de que sea aceptado.
+                * El comentario o motivo es **opcional**: se permite enviar cuerpo vacío (`{}`), nulo o texto sin requerir longitud mínima.
+                * Transiciona a estado `CANCELADA` (4). Si es inmediata abierta (`SOLICITADA_BUSCANDO`), sale de la bolsa general sin requerir notificación (al no tener paseador asignado). Si es programada (`PENDIENTE`), desvincula la atención solicitada.
+            * **B. Paseo YA Aceptado por el Paseador (`ACEPTADA` [2]):**
+                * El cliente puede cancelar el servicio siempre que el paseador no haya marcado el inicio del recorrido (`fecha_hora_inicio_real == null`).
+                * El comentario o motivo es **estrictamente obligatorio**: debe tener una longitud mínima de 10 caracteres y máxima de 500 caracteres (`Constant.MSJ_ERROR_MOTIVO_CANCELACION_OBLIGATORIO`).
+                * Transiciona a estado `CANCELADA` (4), persiste el motivo en `motivo_rechazo_cancelacion`, libera el cupo reservado del bloque horario y emite una notificación interna al paseador asignado (`tipo_notificacion_id = 6 [SOLICITUD_CANCELADA]`, título `"Paseo cancelado por el cliente"`).
+            * **C. Restricciones y Bloqueos de Transición:**
+                * Si el paseo ya arrancó (`solicitud_paseo_estado_id = 5 [EN_CURSO]` o `fecha_hora_inicio_real != null`), la cancelación se bloquea arrojando error de negocio (`MSJ_ERROR_SOLICITUD_EN_CURSO_NO_CANCELABLE`).
+                * Si la solicitud ya se encuentra en un estado terminal (`RECHAZADA` [3], `CANCELADA` [4], `FINALIZADA` [6] o `VENCIDA` [7]), se deniega la operación arrojando `MSJ_ERROR_SOLICITUD_NO_CANCELABLE`.
+
+    4. **Transición Automática por Expiración (`AppTaskScheduler`):**
+        * Tarea periódica cada 60 segundos (`expirarSolicitudesInmediatasVencidas`) que evalúa solicitudes inmediatas con `solicitud_paseo_estado_id = 8 [SOLICITADA_BUSCANDO]` y `hora_vencimiento <= LocalDateTime.now()`.
+        * Transiciona atómicamente a `VENCIDA` (7) sin alterar metadatos manuales, permitiendo auditoría automática por JPA.
+
+    5. **Componentes y Capas Implementadas:**
+        * **Controlador:** `SolicitudPaseoClienteController` (`GET /cliente/solicitudes`, `PATCH /cliente/solicitudes/{uuid}/cancelar`).
+        * **Validador:** `SolicitudPaseoValidator` (`validarConsultaBandejaCliente`, `validarCancelarSolicitudCliente`).
+        * **Servicio:** `SolicitudPaseoService` (`obtenerBandejaCliente` con `@Transactional(readOnly = true)`, `cancelarSolicitudCliente` con `@Transactional(rollbackFor = Exception.class)`).
+        * **Repositorios:** `ISolicitudPaseoJpaRepository` (`findByClienteIdAndEstadosPaginado`), `ISolicitudPaseoRepository`, `SolicitudPaseoRepository`.
+        * **Constantes:** `Constant.java` (`TAB_CLIENTE_ACTIVOS`, `TAB_CLIENTE_PENDIENTES`, `TAB_CLIENTE_HISTORIAL`, `MSJ_BANDEJA_CLIENTE_OBTENIDA`, `MSJ_SOLICITUD_CANCELADA_CLIENTE_EXITO`, `MSJ_ERROR_SOLICITUD_EN_CURSO_NO_CANCELABLE`, `TITULO_NOTIF_SOLICITUD_CANCELADA_CLIENTE`).
+* **Cómo funciona:**
+    * **Consulta de Bandeja ("Mis Paseos"):** El cliente ingresa a la aplicación móvil y navega entre sus 3 pestañas. Por defecto visualiza `PENDIENTES` para revisar sus paseos confirmados próximos a realizarse y las solicitudes que esperan paseador; al momento del paseo conmuta a `ACTIVOS` para monitorear el paseo en curso; y en `HISTORIAL` audita el histórico de todos sus servicios concluidos, cancelados o expirados.
+    * **Flujo de Cancelación Ágil:** Si el cliente solicitó un servicio y desiste antes de que un paseador lo acepte, puede cancelar de forma directa sin redactar un motivo. Si el servicio ya contaba con un paseador comprometido (`ACEPTADA`), el sistema exige un motivo justificado (≥ 10 caracteres) antes de liberar el cupo y notificar de inmediato al paseador asignado.
 ---
 
 ## 4. Historias de Usuario Pendientes
