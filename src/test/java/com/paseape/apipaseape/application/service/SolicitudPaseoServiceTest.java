@@ -618,7 +618,8 @@ class SolicitudPaseoServiceTest {
     @DisplayName("crearSolicitudProgramada - Falla si es hoy y el bloque horario ya transcurrió")
     void testCrearSolicitudProgramada_FalloHoraPasadaMismoDia() {
         LocalDate hoyLima = LocalDate.now(ZoneId.of("America/Lima"));
-        LocalTime horaPasada = LocalTime.now(ZoneId.of("America/Lima")).minusHours(2);
+        LocalTime ahoraLima = LocalTime.now(ZoneId.of("America/Lima"));
+        LocalTime horaPasada = ahoraLima.isAfter(LocalTime.of(0, 5)) ? ahoraLima.minusMinutes(5) : LocalTime.MIN;
         BloqueHorario bloquePasado = BloqueHorario.builder()
                 .id(1)
                 .codigo("B06_07")
@@ -873,5 +874,123 @@ class SolicitudPaseoServiceTest {
                 eq(Constant.ID_ESTADO_SOLICITUD_VENCIDA),
                 any(LocalDateTime.class)
         );
+    }
+
+    @Test
+    @DisplayName("iniciarPaseo - Éxito al cambiar estado a EN_CURSO y generar notificación")
+    void testIniciarPaseo_Exito() throws BadRequestException {
+        String uuid = UUID.randomUUID().toString();
+        SolicitudPaseo solicitud = SolicitudPaseo.builder()
+                .id(100L)
+                .uuid(uuid)
+                .codigoReserva("PAS-202610-001")
+                .paseador(paseador)
+                .cliente(cliente)
+                .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_ACEPTADA))
+                .build();
+
+        when(usuarioRepository.findByCorreo("paseador@paseape.com")).thenReturn(paseadorUsuario);
+        when(paseadorRepository.findByUsuarioId(20L)).thenReturn(paseador);
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(solicitud);
+        when(solicitudPaseoRepository.save(any(SolicitudPaseo.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(solicitudPaseoMascotaRepository.findAllBySolicitudPaseoIdWithDetails(100L)).thenReturn(List.of());
+
+        SolicitudPaseoResDto result = service.iniciarPaseo("paseador@paseape.com", uuid);
+
+        assertNotNull(result);
+        assertEquals(Constant.ID_ESTADO_SOLICITUD_EN_CURSO, solicitud.getSolicitudPaseoEstado().getId());
+        assertNotNull(solicitud.getFechaHoraInicioReal());
+
+        ArgumentCaptor<Notificacion> notifCaptor = ArgumentCaptor.forClass(Notificacion.class);
+        verify(notificacionRepository, times(1)).save(notifCaptor.capture());
+        Notificacion notifGuardada = notifCaptor.getValue();
+        assertEquals(Constant.ID_TIPO_NOTIFICACION_PASEO_INICIADO, notifGuardada.getTipoNotificacion().getId());
+        assertEquals(clienteUsuario.getId(), notifGuardada.getDestinatarioUsuario().getId());
+        assertEquals(paseadorUsuario.getId(), notifGuardada.getRemitenteUsuario().getId());
+        assertEquals(Constant.TITULO_NOTIF_PASEO_INICIADO, notifGuardada.getTitulo());
+    }
+
+    @Test
+    @DisplayName("iniciarPaseo - Falla si la solicitud no existe")
+    void testIniciarPaseo_NoExiste() {
+        String uuid = UUID.randomUUID().toString();
+        when(usuarioRepository.findByCorreo("paseador@paseape.com")).thenReturn(paseadorUsuario);
+        when(paseadorRepository.findByUsuarioId(20L)).thenReturn(paseador);
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(null);
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () ->
+                service.iniciarPaseo("paseador@paseape.com", uuid));
+
+        assertEquals(MessageCodes.ResponseCodeBR98, ex.code);
+        verify(notificacionRepository, never()).save(any(Notificacion.class));
+    }
+
+    @Test
+    @DisplayName("iniciarPaseo - Falla si la solicitud no pertenece al paseador autenticado")
+    void testIniciarPaseo_NoPertenece() {
+        String uuid = UUID.randomUUID().toString();
+        Paseador otroPaseador = Paseador.builder().id(999L).build();
+        SolicitudPaseo solicitud = SolicitudPaseo.builder()
+                .id(100L)
+                .uuid(uuid)
+                .paseador(otroPaseador)
+                .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_ACEPTADA))
+                .build();
+
+        when(usuarioRepository.findByCorreo("paseador@paseape.com")).thenReturn(paseadorUsuario);
+        when(paseadorRepository.findByUsuarioId(20L)).thenReturn(paseador);
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(solicitud);
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () ->
+                service.iniciarPaseo("paseador@paseape.com", uuid));
+
+        assertEquals(MessageCodes.ResponseCodeBR03, ex.code);
+        verify(notificacionRepository, never()).save(any(Notificacion.class));
+    }
+
+    @Test
+    @DisplayName("iniciarPaseo - Falla si la solicitud no está en estado ACEPTADA")
+    void testIniciarPaseo_EstadoInvalido() {
+        String uuid = UUID.randomUUID().toString();
+        SolicitudPaseo solicitud = SolicitudPaseo.builder()
+                .id(100L)
+                .uuid(uuid)
+                .paseador(paseador)
+                .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_PENDIENTE))
+                .build();
+
+        when(usuarioRepository.findByCorreo("paseador@paseape.com")).thenReturn(paseadorUsuario);
+        when(paseadorRepository.findByUsuarioId(20L)).thenReturn(paseador);
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(solicitud);
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () ->
+                service.iniciarPaseo("paseador@paseape.com", uuid));
+
+        assertEquals(MessageCodes.ResponseCodeBR03, ex.code);
+        assertEquals(Constant.MSJ_ERROR_SOLICITUD_NO_INICIABLE, ex.getMessage());
+        verify(notificacionRepository, never()).save(any(Notificacion.class));
+    }
+
+    @Test
+    @DisplayName("iniciarPaseo - Falla si el paseo ya se encuentra EN_CURSO")
+    void testIniciarPaseo_YaEnCurso() {
+        String uuid = UUID.randomUUID().toString();
+        SolicitudPaseo solicitud = SolicitudPaseo.builder()
+                .id(100L)
+                .uuid(uuid)
+                .paseador(paseador)
+                .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_EN_CURSO))
+                .build();
+
+        when(usuarioRepository.findByCorreo("paseador@paseape.com")).thenReturn(paseadorUsuario);
+        when(paseadorRepository.findByUsuarioId(20L)).thenReturn(paseador);
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(solicitud);
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () ->
+                service.iniciarPaseo("paseador@paseape.com", uuid));
+
+        assertEquals(MessageCodes.ResponseCodeBR03, ex.code);
+        assertEquals(Constant.MSJ_ERROR_PASEO_YA_EN_CURSO, ex.getMessage());
+        verify(notificacionRepository, never()).save(any(Notificacion.class));
     }
 }

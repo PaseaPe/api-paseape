@@ -419,6 +419,58 @@ public class SolicitudPaseoPaseadorController extends BaseController {
         }
     }
 
+    @PatchMapping("/{uuid}/iniciar")
+    public ResponseEntity<ResponseDto<SolicitudPaseoResDto>> iniciarPaseo(
+            Principal principal,
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @PathVariable String uuid
+    ) {
+        var response = new ResponseDto<SolicitudPaseoResDto>();
+        Date startDatetime = Calendar.getInstance().getTime();
+        try {
+            ErrorDetailDto validationError = solicitudPaseoValidator.validarUuid(uuid, "uuid");
+            if (validationError != null) {
+                Date endDatetime = Calendar.getInstance().getTime();
+                response.setStatusCode(validationError.getStatusCode());
+                response.setCode(validationError.getCode());
+                response.setMessage(validationError.getMessage());
+                response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
+                return ResponseEntity.status(response.getStatusCode()).body(response);
+            }
+
+            String userEmail = resolverUserEmail(principal, authHeader);
+            SolicitudPaseoResDto data = solicitudPaseoService.iniciarPaseo(userEmail, uuid);
+
+            Date endDatetime = Calendar.getInstance().getTime();
+            HeaderDto headerDto = requestService.getResponseHeader(startDatetime, endDatetime);
+
+            response.setStatusCode(StatusCodes.Code200);
+            response.setCode(MessageCodes.ResponseCodeS00);
+            response.setMessage(Constant.MSJ_PASEO_INICIADO_EXITO);
+            response.setHeader(headerDto);
+            response.setResponse(data);
+            return ResponseEntity.status(response.getStatusCode()).body(response);
+        } catch (BadRequestException ex) {
+            String method = new Object() {}.getClass().getEnclosingMethod().getName();
+            logControllerError(logger, ex, this, method, "iniciarPaseo: uuid=" + uuid);
+            Date endDatetime = Calendar.getInstance().getTime();
+            response.setStatusCode(ex.statusCode != null ? ex.statusCode : StatusCodes.Code400);
+            response.setCode(ex.code != null ? ex.code : MessageCodes.ResponseCodeBR01);
+            response.setMessage(ex.getMessage());
+            response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
+            return ResponseEntity.status(response.getStatusCode()).body(response);
+        } catch (Exception ex) {
+            String method = new Object() {}.getClass().getEnclosingMethod().getName();
+            logControllerError(logger, ex, this, method, "iniciarPaseo: uuid=" + uuid);
+            Date endDatetime = Calendar.getInstance().getTime();
+            response.setStatusCode(StatusCodes.Code500);
+            response.setCode(MessageCodes.ResponseCodeE99);
+            response.setMessage("Error interno al iniciar el paseo");
+            response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
+            return ResponseEntity.status(StatusCodes.Code500).body(response);
+        }
+    }
+
     private String resolverUserEmail(Principal principal, String authHeader) throws BadRequestException {
         if (principal != null && StringUtils.hasText(principal.getName())) {
             return principal.getName().trim().toLowerCase();

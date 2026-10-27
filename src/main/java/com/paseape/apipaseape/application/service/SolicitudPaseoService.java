@@ -871,6 +871,67 @@ public class SolicitudPaseoService {
         return solicitudPaseoDtoMapper.toResDto(guardada, mascotas);
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public SolicitudPaseoResDto iniciarPaseo(String userEmail, String solicitudUuid) throws BadRequestException {
+        if (userEmail == null || userEmail.trim().isEmpty()) {
+            throw new BadRequestException(MessageCodes.ResponseCodeE01, "Usuario no autenticado.");
+        }
+
+        Usuario usuario = usuarioRepository.findByCorreo(userEmail.trim().toLowerCase());
+        if (usuario == null) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR98, "No se encontró el usuario autenticado.");
+        }
+
+        Paseador paseador = paseadorRepository.findByUsuarioId(usuario.getId());
+        if (paseador == null) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR03, "El usuario no cuenta con un perfil de paseador registrado.");
+        }
+
+        SolicitudPaseo solicitud = solicitudPaseoRepository.findByUuidWithDetails(solicitudUuid.trim());
+        if (solicitud == null) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR98, "No se encontró la solicitud de paseo.");
+        }
+
+        if (solicitud.getPaseador() == null || !paseador.getId().equals(solicitud.getPaseador().getId())) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR03, "La solicitud no pertenece al paseador autenticado.");
+        }
+
+        if (solicitud.getSolicitudPaseoEstado() != null
+                && Integer.valueOf(Constant.ID_ESTADO_SOLICITUD_EN_CURSO).equals(solicitud.getSolicitudPaseoEstado().getId())) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR03, Constant.MSJ_ERROR_PASEO_YA_EN_CURSO);
+        }
+
+        if (solicitud.getSolicitudPaseoEstado() == null
+                || !Integer.valueOf(Constant.ID_ESTADO_SOLICITUD_ACEPTADA).equals(solicitud.getSolicitudPaseoEstado().getId())) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR03, Constant.MSJ_ERROR_SOLICITUD_NO_INICIABLE);
+        }
+
+        solicitud.setSolicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_EN_CURSO));
+        solicitud.setFechaHoraInicioReal(LocalDateTime.now());
+        SolicitudPaseo guardada = solicitudPaseoRepository.save(solicitud);
+
+        String paseadorNombre = obtenerNombreCompletoPaseador(usuario, paseador);
+        Usuario destinatario = guardada.getCliente() != null ? guardada.getCliente().getUsuario() : null;
+        if (destinatario != null) {
+            Notificacion notificacion = Notificacion.builder()
+                    .uuid(UUID.randomUUID().toString())
+                    .remitenteUsuario(usuario)
+                    .destinatarioUsuario(destinatario)
+                    .tipoNotificacion(new TipoNotificacion(Constant.ID_TIPO_NOTIFICACION_PASEO_INICIADO))
+                    .titulo(Constant.TITULO_NOTIF_PASEO_INICIADO)
+                    .mensaje("¡Buenas noticias! El paseador " + paseadorNombre + " ha iniciado el paseo " + guardada.getCodigoReserva() + " de tus mascotas.")
+                    .referenciaId(guardada.getId())
+                    .referenciaTipo(Constant.REFERENCIA_TIPO_SOLICITUD_PASEO)
+                    .leido(false)
+                    .estado(Constant.ESTADO_LOGICO_ACTIVO)
+                    .build();
+            notificacionRepository.save(notificacion);
+        }
+
+        List<SolicitudPaseoMascota> mascotas = solicitudPaseoMascotaRepository.findAllBySolicitudPaseoIdWithDetails(guardada.getId());
+        return solicitudPaseoDtoMapper.toResDto(guardada, mascotas);
+    }
+
     @Transactional(readOnly = true)
     public PageResponseDto<SolicitudPaseoResDto> obtenerBandejaCliente(String userEmail, String tab, int page, int size) throws BadRequestException {
         if (userEmail == null || userEmail.trim().isEmpty()) {

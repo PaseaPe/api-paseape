@@ -299,6 +299,7 @@ El Sprint 2 tiene como objetivo habilitar el núcleo operativo y transaccional d
             * `PATCH /api-paseape/paseador/solicitudes/{uuid}/descartar`: Descarte individual de solicitud inmediata en `solicitud_paseo_descarte` sin afectar a otros paseadores.
             * `PATCH /api-paseape/paseador/solicitudes/{uuid}/aceptar`: Aceptación de solicitud programada (`PENDIENTE` [1] ➔ `ACEPTADA` [2]), fija `fecha_hora_aceptada = LocalDateTime.now()` y notifica al cliente (`SOLICITUD_ACEPTADA`).
             * `PATCH /api-paseape/paseador/solicitudes/{uuid}/rechazar`: Rechazo de solicitud programada (`PENDIENTE` [1] ➔ `RECHAZADA` [3]) con motivo opcional (`RechazarSolicitudReqDto`), libera cupos y notifica al cliente (`SOLICITUD_RECHAZADA`).
+            * `PATCH /api-paseape/paseador/solicitudes/{uuid}/iniciar`: Inicio del recorrido del paseo (`ACEPTADA` [2] ➔ `EN_CURSO` [5]), fija `fecha_hora_inicio_real = LocalDateTime.now()`, valida que no haya iniciado previamente y emite una notificación transaccional al cliente (`tipo_notificacion_id = 4 [PASEO_INICIADO]`, título `"¡Tu paseo ha comenzado!"`).
             * `PATCH /api-paseape/paseador/solicitudes/{uuid}/cancelar`: Cancelación de paseo previamente confirmado (`ACEPTADA` [2] ➔ `CANCELADA` [4]) antes de su inicio, con motivo obligatorio de 10 a 500 caracteres (`CancelarSolicitudReqDto`), liberando cupos y notificando al cliente (`SOLICITUD_CANCELADA`).
 
     2. **Flujo Operativo del Cliente – Bandeja "Mis Paseos" (`SolicitudPaseoClienteController`):**

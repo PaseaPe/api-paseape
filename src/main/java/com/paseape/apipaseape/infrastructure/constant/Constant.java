@@ -263,13 +263,17 @@ public class Constant {
     public static final String MSJ_SOLICITUD_ACEPTADA_EXITO = "Solicitud de paseo aceptada exitosamente";
     public static final String MSJ_SOLICITUD_RECHAZADA_EXITO = "Solicitud de paseo rechazada exitosamente";
     public static final String MSJ_SOLICITUD_CANCELADA_EXITO = "Paseo cancelado exitosamente";
+    public static final String MSJ_PASEO_INICIADO_EXITO = "Paseo iniciado exitosamente";
     public static final String MSJ_ERROR_SOLICITUD_NO_PENDIENTE = "La solicitud no se encuentra en estado pendiente de aprobación.";
     public static final String MSJ_ERROR_SOLICITUD_NO_CANCELABLE = "Solo se pueden cancelar paseos que se encuentren en estado aceptado y no hayan iniciado.";
+    public static final String MSJ_ERROR_SOLICITUD_NO_INICIABLE = "Solo se puede iniciar un paseo que se encuentre en estado ACEPTADA.";
+    public static final String MSJ_ERROR_PASEO_YA_EN_CURSO = "El paseo ya se encuentra en curso.";
     public static final String MSJ_ERROR_MOTIVO_CANCELACION_OBLIGATORIO = "El motivo de cancelación es obligatorio y debe tener al menos 10 caracteres.";
 
     public static final String TITULO_NOTIF_SOLICITUD_PROGRAMADA_ACEPTADA = "¡Tu paseo programado ha sido confirmado!";
     public static final String TITULO_NOTIF_SOLICITUD_PROGRAMADA_RECHAZADA = "Actualización de tu solicitud de paseo programado";
     public static final String TITULO_NOTIF_SOLICITUD_CANCELADA_PASEADOR = "Paseo cancelado por el paseador";
+    public static final String TITULO_NOTIF_PASEO_INICIADO = "¡Tu paseo ha comenzado!";
     public static final String MOTIVO_RECHAZO_DEFAULT = "Solicitud declinada por el paseador";
 
     // =========================================================================
