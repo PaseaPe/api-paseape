@@ -1,33 +1,28 @@
 package com.paseape.apipaseape.application.service;
 
+import com.paseape.apipaseape.application.repository.*;
+import com.paseape.apipaseape.domain.entity.*;
+import com.paseape.apipaseape.infrastructure.dto.response.DigitalDocumentResDto;
+import com.paseape.apipaseape.infrastructure.dto.response.FileDownloadResDto;
 import com.paseape.apipaseape.infrastructure.mapper.dto.IMascotaDtoMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import com.paseape.apipaseape.application.repository.IClienteRepository;
-import com.paseape.apipaseape.application.repository.IMascotaRepository;
-import com.paseape.apipaseape.application.repository.IUsuarioRepository;
-import com.paseape.apipaseape.domain.entity.Cliente;
-import com.paseape.apipaseape.domain.entity.Mascota;
-import com.paseape.apipaseape.domain.entity.TipoGeneroMascota;
-import com.paseape.apipaseape.domain.entity.TipoMascota;
-import com.paseape.apipaseape.domain.entity.TipoNivelEnergia;
-import com.paseape.apipaseape.domain.entity.TipoRaza;
-import com.paseape.apipaseape.domain.entity.TipoTamanoMascota;
-import com.paseape.apipaseape.domain.entity.Usuario;
 import com.paseape.apipaseape.infrastructure.dto.request.ActualizarMascotaReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.MascotaReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.RegistrarMascotaReqDto;
 import com.paseape.apipaseape.infrastructure.dto.response.MascotaResDto;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 import static com.paseape.apipaseape.infrastructure.constant.Constant.ESTADO_LOGICO_ACTIVO;
+import static com.paseape.apipaseape.infrastructure.constant.Constant.ID_DOC_FOTO_MASCOTA;
 
 @Service
 @RequiredArgsConstructor
@@ -37,6 +32,10 @@ public class MascotaService {
     private final IUsuarioRepository usuarioRepository;
     private final IClienteRepository clienteRepository;
     private final IMascotaDtoMapper mascotaDtoMapper;
+
+    private final IFolderDigitalDocumentRepository folderRepository;
+    private final IDigitalDocumentRepository digitalDocumentRepository;
+    private final IStorageService storageService;
 
     @Transactional(readOnly = true)
     public Usuario obtenerUsuarioPorCorreo(String correo) {
@@ -53,6 +52,14 @@ public class MascotaService {
 
     @Transactional(rollbackFor = Exception.class)
     public Mascota registrarMascota(Cliente cliente, MascotaReqDto dto) throws BadRequestException {
+
+        FolderDigitalDocument folder = FolderDigitalDocument.builder()
+                .uuid(UUID.randomUUID().toString())
+                .nombre("FOLDER_MASCOTA_" + dto.getNombre().trim().toUpperCase())
+                .estado(ESTADO_LOGICO_ACTIVO)
+                .build();
+        FolderDigitalDocument folderGuardado = folderRepository.save(folder);
+
         Mascota mascota = Mascota.builder()
                 .uuid(UUID.randomUUID().toString())
                 .cliente(cliente)
@@ -69,11 +76,15 @@ public class MascotaService {
                 .sociableConPerros(dto.getSociableConPerros() != null ? dto.getSociableConPerros() : 1)
                 .sociableConPersonas(dto.getSociableConPersonas() != null ? dto.getSociableConPersonas() : 1)
                 .precaucionesMedicas(dto.getPrecaucionesMedicas())
-                .fotoUrl(dto.getFotoUrl())
+                .folderDigitalDocument(folderGuardado)
                 .estado(ESTADO_LOGICO_ACTIVO)
                 .build();
 
-        return mascotaRepository.save(mascota);
+        Mascota mascotaSaved = mascotaRepository.save(mascota);
+        if (dto.getFotoMascota() != null) {
+            subirFotoMascota(mascotaSaved.getUuid(), mascotaSaved.getCliente().getId(), dto.getFotoMascota());
+        }
+        return mascotaRepository.findById(mascotaSaved.getId());
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -102,7 +113,7 @@ public class MascotaService {
         }
 
         Mascota mascotaGuardada = registrarMascota(cliente, reqDto.getMascota());
-        return mascotaDtoMapper.toResDto(mascotaGuardada);
+        return poblarRespuestaMascota(mascotaGuardada);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -157,12 +168,9 @@ public class MascotaService {
         if (reqDto.getPrecaucionesMedicas() != null) {
             mascota.setPrecaucionesMedicas(reqDto.getPrecaucionesMedicas().trim());
         }
-        if (reqDto.getFotoUrl() != null) {
-            mascota.setFotoUrl(reqDto.getFotoUrl().trim());
-        }
 
         Mascota mascotaActualizada = mascotaRepository.save(mascota);
-        return mascotaDtoMapper.toResDto(mascotaActualizada);
+        return poblarRespuestaMascota(mascotaActualizada);
     }
 
     @Transactional(readOnly = true)
@@ -186,6 +194,68 @@ public class MascotaService {
         if (mascota == null){
             throw new BadRequestException("Mascota no encontrada");
         }
-        return mascotaDtoMapper.toResDto(mascota);
+        return poblarRespuestaMascota(mascota);
     }
+
+    @Transactional(rollbackFor = Exception.class)
+    public DigitalDocumentResDto subirFotoMascota(String mascotaUuid, Long clienteId, MultipartFile file) throws BadRequestException {
+        Mascota mascota = mascotaRepository.findByUuid(mascotaUuid);
+        if (mascota == null) {
+            throw new BadRequestException("La mascota especificada no existe.");
+        }
+
+        if (mascota.getCliente() == null || !mascota.getCliente().getId().equals(clienteId)) {
+            throw new BadRequestException("No tiene permisos para subir archivos a esta mascota.");
+        }
+
+        FolderDigitalDocument folder = mascota.getFolderDigitalDocument();
+        if (folder == null) {
+            folder = FolderDigitalDocument.builder()
+                    .uuid(UUID.randomUUID().toString())
+                    .nombre("FOLDER_MASCOTA_" + mascota.getNombre().toUpperCase())
+                    .estado(ESTADO_LOGICO_ACTIVO)
+                    .build();
+            folder = folderRepository.save(folder);
+            mascota.setFolderDigitalDocument(folder);
+            mascotaRepository.save(mascota);
+        }
+
+        String targetFolder = "mascotas/" + mascota.getUuid();
+        String objectName = storageService.uploadFile(targetFolder, file);
+
+        DigitalDocument document = DigitalDocument.builder()
+                .uuid(UUID.randomUUID().toString())
+                .folderDigitalDocument(folder)
+                .digitalDocumentType(new DigitalDocumentType(ID_DOC_FOTO_MASCOTA))
+                .objectName(objectName)
+                .nombreOriginal(file.getOriginalFilename())
+                .contentType(file.getContentType())
+                .tamanoBytes(file.getSize())
+                .estado(ESTADO_LOGICO_ACTIVO)
+                .build();
+
+        DigitalDocument guardado = digitalDocumentRepository.save(document);
+        return mascotaDtoMapper.toDocumentDto(guardado);
+    }
+
+    @Transactional(readOnly = true)
+    public FileDownloadResDto descargarFotoMascota(String documentUuid) throws BadRequestException {
+        DigitalDocument document = digitalDocumentRepository.findByUuid(documentUuid);
+        if (document == null) {
+            throw new BadRequestException("El documento solicitado no existe.");
+        }
+        return storageService.downloadFile(document.getObjectName());
+    }
+
+    private MascotaResDto poblarRespuestaMascota(Mascota mascota) {
+        MascotaResDto dto = mascotaDtoMapper.toResDto(mascota);
+        if (mascota.getFolderDigitalDocument() != null && mascota.getFolderDigitalDocument().getId() != null) {
+            List<DigitalDocument> docs = digitalDocumentRepository.findAllByFolderId(mascota.getFolderDigitalDocument().getId());
+            dto.setDocumentos(mascotaDtoMapper.toDocumentDtoList(docs));
+        } else {
+            dto.setDocumentos(List.of());
+        }
+        return dto;
+    }
+
 }

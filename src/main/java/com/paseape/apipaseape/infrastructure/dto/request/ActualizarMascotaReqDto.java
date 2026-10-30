@@ -31,5 +31,4 @@ public class ActualizarMascotaReqDto {
     private Integer sociableConPerros;
     private Integer sociableConPersonas;
     private String precaucionesMedicas;
-    private String fotoUrl;
 }

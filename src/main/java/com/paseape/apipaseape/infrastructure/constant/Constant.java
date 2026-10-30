@@ -288,4 +288,10 @@ public class Constant {
     public static final String MSJ_SOLICITUD_CANCELADA_CLIENTE_EXITO = "Paseo cancelado exitosamente por el cliente";
     public static final String MSJ_ERROR_SOLICITUD_EN_CURSO_NO_CANCELABLE = "No se puede cancelar un paseo que ya se encuentra en curso.";
     public static final String TITULO_NOTIF_SOLICITUD_CANCELADA_CLIENTE = "Paseo cancelado por el cliente";
+
+    // DIGITAL DOCUMENT TYPE
+    public static final int ID_DOC_FOTO_PERFIL = 1;
+    public static final int ID_DOC_FOTO_MASCOTA = 2;
+    public static final int ID_DOC_ANTECEDENTE_POLICIAL = 3;
+    public static final int ID_DOC_DOCUMENTO_IDENTIDAD = 4;
 }

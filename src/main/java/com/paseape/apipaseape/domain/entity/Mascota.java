@@ -32,7 +32,7 @@ public class Mascota {
     private Integer sociableConPerros;
     private Integer sociableConPersonas;
     private String precaucionesMedicas;
-    private String fotoUrl;
+    private FolderDigitalDocument folderDigitalDocument;
     private Integer estado;
     private LocalDateTime creadoEl;
     private LocalDateTime actualizadoEl;

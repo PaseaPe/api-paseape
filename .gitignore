@@ -40,3 +40,7 @@ out/
 AGENTS.md
 .BOOT-INF
 .documentacion
+
+*.pem
+*.key
+oci_api_key.pem

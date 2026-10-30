@@ -104,7 +104,6 @@ public interface ISolicitudPaseoDtoMapper {
                 .nombre(m.getNombre())
                 .raza(m.getTipoRaza() != null ? m.getTipoRaza().getDescripcion() : null)
                 .tamano(m.getTipoTamanoMascota() != null ? m.getTipoTamanoMascota().getDescripcion() : null)
-                .fotoUrl(m.getFotoUrl())
                 .build();
     }
 }

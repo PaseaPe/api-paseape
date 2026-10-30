@@ -9,6 +9,7 @@ import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.annotation.JsonNaming;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Getter
 @Setter
@@ -39,6 +40,6 @@ public class MascotaResDto {
     private Integer sociableConPerros;
     private Integer sociableConPersonas;
     private String precaucionesMedicas;
-    private String fotoUrl;
+    private List<DigitalDocumentResDto> documentos;
     private Integer estado;
 }

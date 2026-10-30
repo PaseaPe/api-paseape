@@ -37,6 +37,10 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'com.google.api-client:google-api-client:2.2.0'
 
+    // Oracle Cloud Infrastructure (OCI) Object Storage SDK
+    implementation platform('com.oracle.oci.sdk:oci-java-sdk-bom:3.40.0')
+    implementation 'com.oracle.oci.sdk:oci-java-sdk-objectstorage'
+
     // JJWT 0.12.6
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
