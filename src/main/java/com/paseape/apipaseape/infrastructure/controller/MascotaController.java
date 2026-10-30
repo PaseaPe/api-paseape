@@ -1,5 +1,7 @@
 package com.paseape.apipaseape.infrastructure.controller;
 
+import com.paseape.apipaseape.application.service.DigitalDocumentService;
+import com.paseape.apipaseape.infrastructure.constant.Constant;
 import com.paseape.apipaseape.infrastructure.dto.response.*;
 import com.paseape.apipaseape.infrastructure.validator.StorageValidator;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +36,7 @@ public class MascotaController extends BaseController {
     private final MascotaService mascotaService;
     private final MascotaValidator mascotaValidator;
     private final RequestService requestService;
+    private final DigitalDocumentService digitalDocumentService;
     private final StorageValidator storageValidator;
 
     @PostMapping
@@ -237,11 +240,11 @@ public class MascotaController extends BaseController {
     }
 
     @PostMapping("/{mascotaUuid}/fotos")
-    public ResponseEntity<ResponseDto<DigitalDocumentResDto>> subirFotoMascota(
+    public ResponseEntity<ResponseDto<DocumentUrlResDto>> subirFotoMascota(
             Principal principal,
             @PathVariable String mascotaUuid,
             @RequestParam("file") MultipartFile file) {
-        var response = new ResponseDto<DigitalDocumentResDto>();
+        var response = new ResponseDto<DocumentUrlResDto>();
         try {
             Date startDatetime = Calendar.getInstance().getTime();
 
@@ -284,7 +287,7 @@ public class MascotaController extends BaseController {
                 return ResponseEntity.status(response.getStatusCode()).body(response);
             }
 
-            DigitalDocumentResDto docDto = mascotaService.subirFotoMascota(mascotaUuid, cliente.getId(), file);
+            DocumentUrlResDto docDto = digitalDocumentService.subirFotoMascota(mascotaUuid, cliente.getId(), file);
 
             Date endDatetime = Calendar.getInstance().getTime();
             HeaderDto headerDto = requestService.getResponseHeader(startDatetime, endDatetime);
@@ -312,32 +315,6 @@ public class MascotaController extends BaseController {
             response.setCode(MessageCodes.ResponseCodeE99);
             response.setMessage("Error interno al subir la foto de la mascota");
             response.setHeader(requestService.getResponseHeader(Calendar.getInstance().getTime(), endDatetime));
-            return ResponseEntity.status(StatusCodes.Code500).body(response);
-        }
-    }
-
-
-    @GetMapping("/documentos/{documentUuid}/descarga")
-    public ResponseEntity<?> descargarDocumentoMascota(@PathVariable String documentUuid) {
-        try {
-            FileDownloadResDto fileDto = mascotaService.descargarFotoMascota(documentUuid);
-
-            return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType(fileDto.getContentType() != null ? fileDto.getContentType() : MediaType.APPLICATION_OCTET_STREAM_VALUE))
-                    .contentLength(fileDto.getContentLength())
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileDto.getFileName() + "\"")
-                    .body(new InputStreamResource(fileDto.getContent()));
-        } catch (BadRequestException ex) {
-            var response = new ResponseDto<Void>();
-            response.setStatusCode(StatusCodes.Code400);
-            response.setCode(ex.code != null ? ex.code : MessageCodes.ResponseCodeBR01);
-            response.setMessage(ex.getMessage());
-            return ResponseEntity.status(StatusCodes.Code400).body(response);
-        } catch (Exception ex) {
-            var response = new ResponseDto<Void>();
-            response.setStatusCode(StatusCodes.Code500);
-            response.setCode(MessageCodes.ResponseCodeE99);
-            response.setMessage("Error interno al descargar documento de la mascota");
             return ResponseEntity.status(StatusCodes.Code500).body(response);
         }
     }

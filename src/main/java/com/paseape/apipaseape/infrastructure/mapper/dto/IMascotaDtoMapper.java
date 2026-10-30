@@ -1,8 +1,6 @@
 package com.paseape.apipaseape.infrastructure.mapper.dto;
 
-import com.paseape.apipaseape.domain.entity.DigitalDocument;
 import com.paseape.apipaseape.domain.entity.Mascota;
-import com.paseape.apipaseape.infrastructure.dto.response.DigitalDocumentResDto;
 import com.paseape.apipaseape.infrastructure.dto.response.MascotaResDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -24,14 +22,7 @@ public interface IMascotaDtoMapper {
     @Mapping(target = "tipoTamanoMascotaDescripcion", source = "tipoTamanoMascota.descripcion")
     @Mapping(target = "tipoNivelEnergiaId", source = "tipoNivelEnergia.id")
     @Mapping(target = "tipoNivelEnergiaDescripcion", source = "tipoNivelEnergia.descripcion")
-    @Mapping(target = "documentos", source = "folderDigitalDocument.documentos")
     MascotaResDto toResDto(Mascota domain);
 
     List<MascotaResDto> toResDtoList(List<Mascota> domainList);
-
-    @Mapping(target = "tipoDocumentoId", source = "digitalDocumentType.id")
-    @Mapping(target = "tipoDocumentoDescripcion", source = "digitalDocumentType.descripcion")
-    DigitalDocumentResDto toDocumentDto(DigitalDocument domain);
-
-    List<DigitalDocumentResDto> toDocumentDtoList(List<DigitalDocument> domainList);
 }

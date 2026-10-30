@@ -294,4 +294,10 @@ public class Constant {
     public static final int ID_DOC_FOTO_MASCOTA = 2;
     public static final int ID_DOC_ANTECEDENTE_POLICIAL = 3;
     public static final int ID_DOC_DOCUMENTO_IDENTIDAD = 4;
+
+    public static final int STORAGE_PAR_EXPIRATION_MINUTES = 30;
+
+    public static final String MSG_DESCARGA_FOTO_EXITOSA = "URL de documento generado exitosamente.";
+    public static final String MSG_SUBIDA_ANTECEDENTES_EXITOSA = "Antecedentes policiales subidos exitosamente.";
+    public static final String MSG_ELIMINAR_DOCUMENTO_EXITOSO = "Documento digital eliminado exitosamente.";
 }

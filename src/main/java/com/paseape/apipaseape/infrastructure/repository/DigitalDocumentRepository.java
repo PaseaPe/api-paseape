@@ -19,7 +19,6 @@ public class DigitalDocumentRepository implements IDigitalDocumentRepository {
     private final IDigitalDocumentDboMapper mapper;
 
     @Override
-    @Transactional(readOnly = true)
     public DigitalDocument findById(Long id) {
         if (id == null) return null;
         DigitalDocumentEntity entity = jpaRepository.findById(id.longValue());
@@ -27,7 +26,6 @@ public class DigitalDocumentRepository implements IDigitalDocumentRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public DigitalDocument findByUuid(String uuid) {
         if (uuid == null || uuid.trim().isEmpty()) return null;
         DigitalDocumentEntity entity = jpaRepository.findByUuid(uuid.trim());
@@ -35,7 +33,6 @@ public class DigitalDocumentRepository implements IDigitalDocumentRepository {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<DigitalDocument> findAllByFolderId(Long folderId) {
         if (folderId == null) return List.of();
         List<DigitalDocumentEntity> entities = jpaRepository.findByFolderDigitalDocumentId(folderId);
@@ -43,10 +40,15 @@ public class DigitalDocumentRepository implements IDigitalDocumentRepository {
     }
 
     @Override
-    @Transactional
     public DigitalDocument save(DigitalDocument document) {
         DigitalDocumentEntity entity = mapper.toEntity(document);
         DigitalDocumentEntity saved = jpaRepository.save(entity);
         return mapper.toDomain(saved);
+    }
+
+    @Override
+    public DigitalDocument findByFolderIdAndDigitalDocumentTypeId(Long folderId, Integer digitalDocumentTypeId) {
+        DigitalDocumentEntity entity = jpaRepository.findByFolderDigitalDocumentIdAndDigitalDocumentTypeId(folderId, digitalDocumentTypeId);
+        return mapper.toDomain(entity);
     }
 }

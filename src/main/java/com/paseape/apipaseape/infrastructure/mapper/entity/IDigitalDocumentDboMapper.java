@@ -18,7 +18,6 @@ public interface IDigitalDocumentDboMapper {
     DigitalDocumentType toDomain(DigitalDocumentTypeEntity entity);
     DigitalDocumentTypeEntity toEntity(DigitalDocumentType domain);
 
-    @Mapping(target = "documentos", ignore = true)
     FolderDigitalDocument toDomain(FolderDigitalDocumentEntity entity);
     FolderDigitalDocumentEntity toEntity(FolderDigitalDocument domain);
 

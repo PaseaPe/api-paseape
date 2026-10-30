@@ -18,6 +18,7 @@ import com.paseape.apipaseape.infrastructure.dto.response.DisponibilidadPaseador
 import com.paseape.apipaseape.infrastructure.dto.response.PaseadorResDto;
 import com.paseape.apipaseape.infrastructure.dto.response.UsuarioResDto;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
+import com.paseape.apipaseape.infrastructure.mapper.dto.IDigitalDocumentDtoMapper;
 import com.paseape.apipaseape.infrastructure.mapper.dto.IPaseadorDtoMapper;
 import com.paseape.apipaseape.infrastructure.mapper.dto.IUsuarioDtoMapper;
 import lombok.RequiredArgsConstructor;
@@ -38,10 +39,13 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class PaseadorService {
 
+    private final DigitalDocumentService digitalDocumentService;
+
     private final IPaseadorRepository paseadorRepository;
     private final IUsuarioRepository usuarioRepository;
     private final IPaseadorDtoMapper paseadorDtoMapper;
     private final IUsuarioDtoMapper usuarioDtoMapper;
+    private final IDigitalDocumentDtoMapper digitalDocumentDtoMapper;
     private final IDisponibilidadPaseadorRepository disponibilidadRepository;
     private final ISolicitudPaseoRepository solicitudPaseoRepository;
     private final IDiaSemanaRepository diaSemanaRepository;
@@ -91,7 +95,10 @@ public class PaseadorService {
         if (usuario == null) {
             throw new BadRequestException("No se encontró el usuario del paseador.");
         }
-        return usuarioDtoMapper.toResDto(usuario, null, paseador, null, paseadorDtoMapper);
+        UsuarioResDto usuarioResDto = usuarioDtoMapper.toResDto(usuario, null, paseador, null, paseadorDtoMapper);
+        usuarioResDto.setFotoPerfilUrl(digitalDocumentService.urlFotoPerfil(usuario));
+        usuarioResDto.setDigitalDocuments(digitalDocumentDtoMapper.toResDtoList(digitalDocumentService.documentList(usuario.getFolderDigitalDocument().getId())));
+        return usuarioResDto;
     }
 
     @Transactional(readOnly = true)

@@ -40,6 +40,6 @@ public class MascotaResDto {
     private Integer sociableConPerros;
     private Integer sociableConPersonas;
     private String precaucionesMedicas;
-    private List<DigitalDocumentResDto> documentos;
+    private DocumentUrlResDto fotoMascota;
     private Integer estado;
 }

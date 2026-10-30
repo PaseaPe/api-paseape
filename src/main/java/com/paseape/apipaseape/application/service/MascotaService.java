@@ -3,9 +3,11 @@ package com.paseape.apipaseape.application.service;
 import com.paseape.apipaseape.application.repository.*;
 import com.paseape.apipaseape.domain.entity.*;
 import com.paseape.apipaseape.infrastructure.dto.response.DigitalDocumentResDto;
+import com.paseape.apipaseape.infrastructure.dto.response.DocumentUrlResDto;
 import com.paseape.apipaseape.infrastructure.dto.response.FileDownloadResDto;
 import com.paseape.apipaseape.infrastructure.mapper.dto.IMascotaDtoMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -21,9 +23,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
-import static com.paseape.apipaseape.infrastructure.constant.Constant.ESTADO_LOGICO_ACTIVO;
-import static com.paseape.apipaseape.infrastructure.constant.Constant.ID_DOC_FOTO_MASCOTA;
+import static com.paseape.apipaseape.infrastructure.constant.Constant.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MascotaService {
@@ -36,6 +38,7 @@ public class MascotaService {
     private final IFolderDigitalDocumentRepository folderRepository;
     private final IDigitalDocumentRepository digitalDocumentRepository;
     private final IStorageService storageService;
+    private final DigitalDocumentService digitalDocumentService;
 
     @Transactional(readOnly = true)
     public Usuario obtenerUsuarioPorCorreo(String correo) {
@@ -82,7 +85,7 @@ public class MascotaService {
 
         Mascota mascotaSaved = mascotaRepository.save(mascota);
         if (dto.getFotoMascota() != null) {
-            subirFotoMascota(mascotaSaved.getUuid(), mascotaSaved.getCliente().getId(), dto.getFotoMascota());
+            digitalDocumentService.subirFotoMascota(mascotaSaved.getUuid(), mascotaSaved.getCliente().getId(), dto.getFotoMascota());
         }
         return mascotaRepository.findById(mascotaSaved.getId());
     }
@@ -197,63 +200,13 @@ public class MascotaService {
         return poblarRespuestaMascota(mascota);
     }
 
-    @Transactional(rollbackFor = Exception.class)
-    public DigitalDocumentResDto subirFotoMascota(String mascotaUuid, Long clienteId, MultipartFile file) throws BadRequestException {
-        Mascota mascota = mascotaRepository.findByUuid(mascotaUuid);
-        if (mascota == null) {
-            throw new BadRequestException("La mascota especificada no existe.");
-        }
-
-        if (mascota.getCliente() == null || !mascota.getCliente().getId().equals(clienteId)) {
-            throw new BadRequestException("No tiene permisos para subir archivos a esta mascota.");
-        }
-
-        FolderDigitalDocument folder = mascota.getFolderDigitalDocument();
-        if (folder == null) {
-            folder = FolderDigitalDocument.builder()
-                    .uuid(UUID.randomUUID().toString())
-                    .nombre("FOLDER_MASCOTA_" + mascota.getNombre().toUpperCase())
-                    .estado(ESTADO_LOGICO_ACTIVO)
-                    .build();
-            folder = folderRepository.save(folder);
-            mascota.setFolderDigitalDocument(folder);
-            mascotaRepository.save(mascota);
-        }
-
-        String targetFolder = "mascotas/" + mascota.getUuid();
-        String objectName = storageService.uploadFile(targetFolder, file);
-
-        DigitalDocument document = DigitalDocument.builder()
-                .uuid(UUID.randomUUID().toString())
-                .folderDigitalDocument(folder)
-                .digitalDocumentType(new DigitalDocumentType(ID_DOC_FOTO_MASCOTA))
-                .objectName(objectName)
-                .nombreOriginal(file.getOriginalFilename())
-                .contentType(file.getContentType())
-                .tamanoBytes(file.getSize())
-                .estado(ESTADO_LOGICO_ACTIVO)
-                .build();
-
-        DigitalDocument guardado = digitalDocumentRepository.save(document);
-        return mascotaDtoMapper.toDocumentDto(guardado);
-    }
-
-    @Transactional(readOnly = true)
-    public FileDownloadResDto descargarFotoMascota(String documentUuid) throws BadRequestException {
-        DigitalDocument document = digitalDocumentRepository.findByUuid(documentUuid);
-        if (document == null) {
-            throw new BadRequestException("El documento solicitado no existe.");
-        }
-        return storageService.downloadFile(document.getObjectName());
-    }
-
-    private MascotaResDto poblarRespuestaMascota(Mascota mascota) {
+    private MascotaResDto poblarRespuestaMascota(Mascota mascota) throws BadRequestException {
         MascotaResDto dto = mascotaDtoMapper.toResDto(mascota);
         if (mascota.getFolderDigitalDocument() != null && mascota.getFolderDigitalDocument().getId() != null) {
-            List<DigitalDocument> docs = digitalDocumentRepository.findAllByFolderId(mascota.getFolderDigitalDocument().getId());
-            dto.setDocumentos(mascotaDtoMapper.toDocumentDtoList(docs));
-        } else {
-            dto.setDocumentos(List.of());
+            DigitalDocument fotoMascota = digitalDocumentRepository.findByFolderIdAndDigitalDocumentTypeId(mascota.getFolderDigitalDocument().getId(), ID_DOC_FOTO_MASCOTA);
+            if (fotoMascota != null) {
+                dto.setFotoMascota(digitalDocumentService.descargarDocumento(fotoMascota.getUuid()));
+            }
         }
         return dto;
     }

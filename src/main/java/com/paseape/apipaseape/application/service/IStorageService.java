@@ -8,5 +8,11 @@ public interface IStorageService {
 
     String uploadFile(String folder, MultipartFile file) throws BadRequestException;
 
+    String uploadFile(String folder, byte[] content, String originalFilename, String contentType) throws BadRequestException;
+
     FileDownloadResDto downloadFile(String objectName) throws BadRequestException;
+
+    void deleteFile(String objectName) throws BadRequestException;
+
+    String generatePreSignedUrl(String objectName, int expirationMinutes) throws BadRequestException;
 }

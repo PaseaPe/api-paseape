@@ -11,4 +11,5 @@ public interface IDigitalDocumentJpaRepository extends JpaRepository<DigitalDocu
     DigitalDocumentEntity findById(long id);
     DigitalDocumentEntity findByUuid(String uuid);
     List<DigitalDocumentEntity> findByFolderDigitalDocumentId(Long folderId);
+    DigitalDocumentEntity findByFolderDigitalDocumentIdAndDigitalDocumentTypeId(Long folderId, Integer digitalDocumentTypeId);
 }

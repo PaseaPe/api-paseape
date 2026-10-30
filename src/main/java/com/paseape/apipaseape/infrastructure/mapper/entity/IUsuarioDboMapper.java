@@ -12,7 +12,8 @@ import java.util.List;
         uses = {
                 ITipoUsuarioDboMapper.class,
                 IUsuarioEstadoDboMapper.class,
-                ITipoProveedorAuthDboMapper.class
+                ITipoProveedorAuthDboMapper.class,
+                IDigitalDocumentDboMapper.class
         }
 )
 public interface IUsuarioDboMapper {

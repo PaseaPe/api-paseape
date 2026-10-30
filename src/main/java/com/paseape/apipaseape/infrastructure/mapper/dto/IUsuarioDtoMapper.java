@@ -24,6 +24,7 @@ public interface IUsuarioDtoMapper {
     @Mapping(target = "tipoProveedorAuthDescripcion", source = "tipoProveedorAuth.descripcion")
     @Mapping(target = "cliente", ignore = true)
     @Mapping(target = "paseador", ignore = true)
+    @Mapping(target = "fotoPerfilUrl", ignore = true)
     UsuarioResDto toResDto(Usuario domain);
 
     default UsuarioResDto toResDto(Usuario domain, Cliente cliente, Paseador paseador, IClienteDtoMapper clienteMapper, IPaseadorDtoMapper paseadorMapper) {

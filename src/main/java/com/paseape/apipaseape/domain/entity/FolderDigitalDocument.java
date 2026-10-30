@@ -18,7 +18,6 @@ public class FolderDigitalDocument {
     private Long id;
     private String uuid;
     private String nombre;
-    private List<DigitalDocument> documentos;
     private Integer estado;
     private LocalDateTime creadoEl;
     private LocalDateTime actualizadoEl;

@@ -8,4 +8,5 @@ public interface IDigitalDocumentRepository {
     DigitalDocument findByUuid(String uuid);
     List<DigitalDocument> findAllByFolderId(Long folderId);
     DigitalDocument save(DigitalDocument document);
+    DigitalDocument findByFolderIdAndDigitalDocumentTypeId(Long folderId, Integer digitalDocumentTypeId);
 }

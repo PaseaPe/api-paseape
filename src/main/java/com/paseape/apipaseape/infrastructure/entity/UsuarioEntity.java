@@ -1,18 +1,7 @@
 package com.paseape.apipaseape.infrastructure.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import jakarta.persistence.*;
+import lombok.*;
 import org.hibernate.annotations.SQLRestriction;
 
 @Entity
@@ -68,6 +57,10 @@ public class UsuarioEntity extends Auditable {
 
     @Column(name = "provider_id", length = 100, unique = true)
     private String providerId;
+
+    @ManyToOne
+    @JoinColumn(name = "folder_digital_document_id")
+    private FolderDigitalDocumentEntity folderDigitalDocument;
 
     @Column(name = "estado", nullable = false)
     private Integer estado;

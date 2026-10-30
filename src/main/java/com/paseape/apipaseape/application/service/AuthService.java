@@ -1,38 +1,36 @@
 package com.paseape.apipaseape.application.service;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import com.paseape.apipaseape.application.repository.*;
 import com.paseape.apipaseape.domain.entity.*;
-import lombok.RequiredArgsConstructor;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
-
-import com.paseape.apipaseape.application.repository.IClienteRepository;
-import com.paseape.apipaseape.application.repository.IPaseadorRepository;
-import com.paseape.apipaseape.application.repository.IUsuarioRepository;
+import com.paseape.apipaseape.domain.event.GoogleUserRegisteredEvent;
 import com.paseape.apipaseape.infrastructure.dto.request.ActualizarPerfilReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.ForgotPasswordReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.GoogleAuthReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.LoginReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.ResetPasswordReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.UsuarioReqDto;
-import com.paseape.apipaseape.infrastructure.dto.response.AuthResDto;
-import com.paseape.apipaseape.infrastructure.dto.response.ForgotPasswordResDto;
-import com.paseape.apipaseape.infrastructure.dto.response.LogoutResDto;
-import com.paseape.apipaseape.infrastructure.dto.response.PerfilResDto;
+import com.paseape.apipaseape.infrastructure.dto.response.*;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
 import com.paseape.apipaseape.infrastructure.mapper.dto.IPerfilDtoMapper;
 import com.paseape.apipaseape.infrastructure.repository.http.BrevoEmailHttpRepository;
 import com.paseape.apipaseape.infrastructure.repository.http.GoogleTokenVerifierHttpRepository;
 import com.paseape.apipaseape.infrastructure.security.JwtTokenProvider;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.util.UUID;
 
 import static com.paseape.apipaseape.infrastructure.constant.Constant.*;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -42,10 +40,12 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final MascotaService mascotaService;
     private final BrevoEmailHttpRepository brevoEmailHttpRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     private final IUsuarioRepository usuarioRepository;
     private final IClienteRepository clienteRepository;
     private final IPaseadorRepository paseadorRepository;
+
     private final IPerfilDtoMapper perfilDtoMapper;
 
     @Transactional(readOnly = true)
@@ -144,7 +144,8 @@ public class AuthService {
         if (!StringUtils.hasText(nombres)) nombres = (String) payload.get("name");
         if (!StringUtils.hasText(apellidos)) apellidos = "";
 
-        String fotoUrl = StringUtils.hasText(reqDto.getFotoPerfilUrl()) ? reqDto.getFotoPerfilUrl() : (String) payload.get("picture");
+        String googlePictureUrl = (String) payload.get("picture");
+        String fotoUrl = StringUtils.hasText(reqDto.getFotoPerfilUrl()) ? reqDto.getFotoPerfilUrl() : googlePictureUrl;
 
         Usuario nuevoUsuario = Usuario.builder()
                 .uuid(UUID.randomUUID().toString())
@@ -164,6 +165,13 @@ public class AuthService {
 
         Usuario savedUser = usuarioRepository.save(nuevoUsuario);
         procesarSubtipo(savedUser, reqDto);
+
+        if (StringUtils.hasText(googlePictureUrl)) {
+            eventPublisher.publishEvent(GoogleUserRegisteredEvent.builder()
+                    .usuarioUuid(savedUser.getUuid())
+                    .googlePictureUrl(googlePictureUrl)
+                    .build());
+        }
 
         String role = resolveRoleName(savedUser.getTipoUsuario().getId());
         String jwtToken = jwtTokenProvider.generateToken(savedUser.getId(), savedUser.getCorreo(), role);
@@ -291,7 +299,7 @@ public class AuthService {
             throw new BadRequestException("El usuario asociado al token no existe.");
         }
 
-        if (usuario.getEstado() != null && usuario.getEstado() == ESTADO_LOGICO_INACTIVO) {
+        if (usuario.getEstado() != null && usuario.getEstado().equals(ESTADO_LOGICO_INACTIVO)) {
             throw new BadRequestException("La cuenta de usuario se encuentra inactiva.");
         }
 
@@ -308,7 +316,6 @@ public class AuthService {
 
         validarEstadoUsuario(usuario);
 
-        // Actualizar campos base de usuario
         if (StringUtils.hasText(reqDto.getNombres())) {
             usuario.setNombres(reqDto.getNombres().trim());
         }
@@ -324,14 +331,13 @@ public class AuthService {
 
         Usuario usuarioGuardado = usuarioRepository.save(usuario);
 
-        // Actualizar subtipo e hidratar la respuesta según el tipo de usuario
         Integer tipoUsuarioId = usuarioGuardado.getTipoUsuario() != null ? usuarioGuardado.getTipoUsuario().getId() : null;
         PerfilResDto perfilResDto = perfilDtoMapper.toPerfilResDto(usuarioGuardado);
 
-        if (tipoUsuarioId != null && tipoUsuarioId == ID_CLIENTE) {
+        if (tipoUsuarioId != null && tipoUsuarioId.equals(ID_CLIENTE)) {
             Cliente clienteActualizado = actualizarCliente(usuarioGuardado, reqDto);
             perfilDtoMapper.enrichClienteFields(clienteActualizado, perfilResDto);
-        } else if (tipoUsuarioId != null && tipoUsuarioId == ID_PASEADOR) {
+        } else if (tipoUsuarioId != null && tipoUsuarioId.equals(ID_PASEADOR)) {
             Paseador paseadorActualizado = actualizarPaseador(usuarioGuardado, reqDto);
             perfilDtoMapper.enrichPaseadorFields(paseadorActualizado, perfilResDto);
         }
@@ -384,7 +390,7 @@ public class AuthService {
     }
 
     private void procesarSubtipo(Usuario usuario, UsuarioReqDto reqDto) throws BadRequestException {
-        if (usuario.getTipoUsuario().getId() == ID_CLIENTE) {
+        if (usuario.getTipoUsuario().getId().equals(ID_CLIENTE)) {
             DistritoLima distrito = reqDto.getDistritoId() != null ? new DistritoLima(reqDto.getDistritoId()) : null;
 
             Cliente nuevoCliente = Cliente.builder()
@@ -404,7 +410,7 @@ public class AuthService {
                 mascotaService.registrarMascotas(savedCliente, reqDto.getMascotas());
             }
 
-        } else if (usuario.getTipoUsuario().getId() == ID_PASEADOR) {
+        } else if (usuario.getTipoUsuario().getId().equals(ID_PASEADOR)) {
             if (StringUtils.hasText(reqDto.getNumeroDocumento())) {
                 Paseador existing = paseadorRepository.findByNumeroDocumento(reqDto.getNumeroDocumento().trim());
                 if (existing != null) {
@@ -438,19 +444,19 @@ public class AuthService {
     }
 
     private void validarEstadoUsuario(Usuario usuario) throws BadRequestException {
-        if (usuario.getUsuarioEstado() != null && usuario.getUsuarioEstado().getId() == ID_BLOQUEADO) {
+        if (usuario.getUsuarioEstado() != null && usuario.getUsuarioEstado().getId().equals(ID_BLOQUEADO)) {
             throw new BadRequestException("La cuenta de usuario se encuentra bloqueada.");
         }
-        if (usuario.getEstado() != null && usuario.getEstado() == ESTADO_LOGICO_INACTIVO) {
+        if (usuario.getEstado() != null && usuario.getEstado().equals(ESTADO_LOGICO_INACTIVO)) {
             throw new BadRequestException("La cuenta de usuario se encuentra inactiva.");
         }
     }
 
     private String resolveRoleName(Integer tipoUsuarioId) {
-        if (tipoUsuarioId != null && tipoUsuarioId == ID_ADMINISTRADOR) {
+        if (tipoUsuarioId != null && tipoUsuarioId.equals(ID_ADMINISTRADOR)) {
             return ROL_ADMINISTRADOR;
         }
-        if (tipoUsuarioId != null && tipoUsuarioId == ID_PASEADOR) {
+        if (tipoUsuarioId != null && tipoUsuarioId.equals(ID_PASEADOR)) {
             return ROL_PASEADOR;
         }
         return ROL_CLIENTE;

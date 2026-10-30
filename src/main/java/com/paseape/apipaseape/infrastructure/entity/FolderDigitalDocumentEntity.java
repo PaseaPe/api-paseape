@@ -39,9 +39,6 @@ public class FolderDigitalDocumentEntity extends Auditable {
     @Column(name = "nombre", nullable = false, length = 100)
     private String nombre;
 
-    @OneToMany(mappedBy = "folderDigitalDocument", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<DigitalDocumentEntity> documentos;
-
     @Column(name = "estado", nullable = false)
     private Integer estado;
 }
