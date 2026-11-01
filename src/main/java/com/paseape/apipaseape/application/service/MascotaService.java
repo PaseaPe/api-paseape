@@ -19,6 +19,7 @@ import com.paseape.apipaseape.infrastructure.dto.response.MascotaResDto;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.security.Principal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -37,7 +38,6 @@ public class MascotaService {
 
     private final IFolderDigitalDocumentRepository folderRepository;
     private final IDigitalDocumentRepository digitalDocumentRepository;
-    private final IStorageService storageService;
     private final DigitalDocumentService digitalDocumentService;
 
     @Transactional(readOnly = true)
@@ -198,6 +198,13 @@ public class MascotaService {
             throw new BadRequestException("Mascota no encontrada");
         }
         return poblarRespuestaMascota(mascota);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public DocumentUrlResDto subirFotoMascota(Principal principal, String mascotaUuid, MultipartFile file) throws BadRequestException{
+        Usuario usuario = obtenerUsuarioPorCorreo(principal.getName());
+        Cliente cliente = obtenerClientePorUsuarioId(usuario.getId());
+        return digitalDocumentService.subirFotoMascota(mascotaUuid, cliente.getId(), file);
     }
 
     private MascotaResDto poblarRespuestaMascota(Mascota mascota) throws BadRequestException {

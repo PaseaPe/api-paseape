@@ -1,5 +1,8 @@
 package com.paseape.apipaseape.infrastructure.validator;
 
+import com.paseape.apipaseape.application.repository.IUsuarioRepository;
+import com.paseape.apipaseape.domain.entity.Usuario;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -8,12 +11,35 @@ import com.paseape.apipaseape.infrastructure.constant.MessageCodes;
 import com.paseape.apipaseape.infrastructure.constant.StatusCodes;
 import com.paseape.apipaseape.infrastructure.dto.request.CambiarDistritoCoberturaReqDto;
 import com.paseape.apipaseape.infrastructure.dto.response.ErrorDetailDto;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.security.Principal;
 import java.time.LocalDate;
 import java.time.ZoneId;
 
 @Component
+@RequiredArgsConstructor
 public class PaseadorValidator {
+    private final IUsuarioRepository usuarioRepository;
+    private final StorageValidator storageValidator;
+
+    public ErrorDetailDto validateSubirFotoUsuario(Principal principal, MultipartFile file) {
+        if (principal == null || !StringUtils.hasText(principal.getName())) {
+            return buildError(StatusCodes.Code401, MessageCodes.ResponseCodeE01, "No se encontro una sesion activa autenticada");
+        }
+
+        Usuario usuario = usuarioRepository.findByCorreo(principal.getName());
+        if (usuario == null) {
+            return buildError(StatusCodes.Code404, MessageCodes.ResponseCodeBR98, "Usuario no encontrado");
+        }
+
+        ErrorDetailDto fileError = storageValidator.validateUpload(file);
+        if (fileError != null) {
+            return fileError;
+        }
+
+        return null;
+    }
 
     public ErrorDetailDto validateCambiarDistritoCobertura(CambiarDistritoCoberturaReqDto request) {
         if (request == null) {

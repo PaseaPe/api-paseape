@@ -48,8 +48,7 @@ public class DigitalDocumentService {
     private final IDigitalDocumentDtoMapper digitalDocumentDtoMapper;
 
     @Transactional(rollbackFor = Exception.class)
-    public DocumentUrlResDto subirFotoUsuario(String usuarioUuid, MultipartFile file) throws BadRequestException {
-        Usuario usuario = buscarUsuario(usuarioUuid);
+    public DocumentUrlResDto subirFotoUsuario(Usuario usuario, MultipartFile file) throws BadRequestException {
         String carpeta = RUTA_USUARIO + usuario.getUuid();
 
         return reemplazarDocumento(

@@ -5,18 +5,10 @@ import com.paseape.apipaseape.application.repository.IDisponibilidadPaseadorRepo
 import com.paseape.apipaseape.application.repository.IPaseadorRepository;
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoRepository;
 import com.paseape.apipaseape.application.repository.IUsuarioRepository;
-import com.paseape.apipaseape.domain.entity.BloqueHorario;
-import com.paseape.apipaseape.domain.entity.DiaSemana;
-import com.paseape.apipaseape.domain.entity.DisponibilidadPaseador;
-import com.paseape.apipaseape.domain.entity.DistritoLima;
-import com.paseape.apipaseape.domain.entity.Paseador;
-import com.paseape.apipaseape.domain.entity.Usuario;
+import com.paseape.apipaseape.domain.entity.*;
 import com.paseape.apipaseape.infrastructure.constant.Constant;
 import com.paseape.apipaseape.infrastructure.dto.request.CambiarDistritoCoberturaReqDto;
-import com.paseape.apipaseape.infrastructure.dto.response.DisponibilidadBloqueFechaResDto;
-import com.paseape.apipaseape.infrastructure.dto.response.DisponibilidadPaseadorFechaResDto;
-import com.paseape.apipaseape.infrastructure.dto.response.PaseadorResDto;
-import com.paseape.apipaseape.infrastructure.dto.response.UsuarioResDto;
+import com.paseape.apipaseape.infrastructure.dto.response.*;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
 import com.paseape.apipaseape.infrastructure.mapper.dto.IDigitalDocumentDtoMapper;
 import com.paseape.apipaseape.infrastructure.mapper.dto.IPaseadorDtoMapper;
@@ -25,7 +17,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.security.Principal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -256,5 +250,11 @@ public class PaseadorService {
                 .diaSemanaDescripcion(diaSemanaDescripcion)
                 .bloques(bloquesRes)
                 .build();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public DocumentUrlResDto subirFotoPaseador(Principal principal, MultipartFile file) throws BadRequestException{
+        Usuario usuario = usuarioRepository.findByCorreo(principal.getName());
+        return digitalDocumentService.subirFotoUsuario(usuario, file);
     }
 }

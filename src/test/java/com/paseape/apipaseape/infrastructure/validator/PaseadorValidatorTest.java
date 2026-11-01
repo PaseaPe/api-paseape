@@ -1,27 +1,121 @@
 package com.paseape.apipaseape.infrastructure.validator;
 
+import com.paseape.apipaseape.application.repository.IUsuarioRepository;
+import com.paseape.apipaseape.domain.entity.Usuario;
 import com.paseape.apipaseape.infrastructure.constant.Constant;
 import com.paseape.apipaseape.infrastructure.constant.MessageCodes;
 import com.paseape.apipaseape.infrastructure.constant.StatusCodes;
 import com.paseape.apipaseape.infrastructure.dto.request.CambiarDistritoCoberturaReqDto;
 import com.paseape.apipaseape.infrastructure.dto.response.ErrorDetailDto;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.security.Principal;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class PaseadorValidatorTest {
 
+    @Mock
+    private IUsuarioRepository usuarioRepository;
+
+    @Mock
+    private StorageValidator storageValidator;
+
+    @InjectMocks
     private PaseadorValidator validator;
 
-    @BeforeEach
-    void setUp() {
-        validator = new PaseadorValidator();
+    @Test
+    @DisplayName("validateSubirFotoUsuario - Falla cuando principal es nulo o su nombre está vacío")
+    void testValidateSubirFotoUsuario_PrincipalInvalido() {
+        MultipartFile file = mock(MultipartFile.class);
+
+        ErrorDetailDto errNull = validator.validateSubirFotoUsuario(null, file);
+        assertNotNull(errNull);
+        assertEquals(StatusCodes.Code401, errNull.getStatusCode());
+        assertEquals(MessageCodes.ResponseCodeE01, errNull.getCode());
+
+        Principal principalVacio = () -> "   ";
+        ErrorDetailDto errBlank = validator.validateSubirFotoUsuario(principalVacio, file);
+        assertNotNull(errBlank);
+        assertEquals(StatusCodes.Code401, errBlank.getStatusCode());
+        assertEquals(MessageCodes.ResponseCodeE01, errBlank.getCode());
+
+        verifyNoInteractions(usuarioRepository);
+        verifyNoInteractions(storageValidator);
+    }
+
+    @Test
+    @DisplayName("validateSubirFotoUsuario - Falla cuando el usuario no existe en la BD")
+    void testValidateSubirFotoUsuario_UsuarioNoExiste() {
+        String correo = "paseador@paseape.com";
+        Principal principal = () -> correo;
+        MultipartFile file = mock(MultipartFile.class);
+
+        when(usuarioRepository.findByCorreo(correo)).thenReturn(null);
+
+        ErrorDetailDto err = validator.validateSubirFotoUsuario(principal, file);
+
+        assertNotNull(err);
+        assertEquals(StatusCodes.Code404, err.getStatusCode());
+        assertEquals(MessageCodes.ResponseCodeBR98, err.getCode());
+        verifyNoInteractions(storageValidator);
+    }
+
+    @Test
+    @DisplayName("validateSubirFotoUsuario - Retorna error cuando storageValidator rechaza el archivo")
+    void testValidateSubirFotoUsuario_ErrorArchivo() {
+        String correo = "paseador@paseape.com";
+        Principal principal = () -> correo;
+        MultipartFile file = mock(MultipartFile.class);
+        Usuario usuario = Usuario.builder().id(10L).correo(correo).build();
+
+        ErrorDetailDto fileError = ErrorDetailDto.builder()
+                .statusCode(StatusCodes.Code400)
+                .code(MessageCodes.ResponseCodeBR01)
+                .message("Tipo de archivo no permitido")
+                .build();
+
+        when(usuarioRepository.findByCorreo(correo)).thenReturn(usuario);
+        when(storageValidator.validateUpload(file)).thenReturn(fileError);
+
+        ErrorDetailDto err = validator.validateSubirFotoUsuario(principal, file);
+
+        assertNotNull(err);
+        assertEquals(StatusCodes.Code400, err.getStatusCode());
+        assertEquals(MessageCodes.ResponseCodeBR01, err.getCode());
+        assertEquals("Tipo de archivo no permitido", err.getMessage());
+    }
+
+    @Test
+    @DisplayName("validateSubirFotoUsuario - Retorna null cuando todas las validaciones son exitosas")
+    void testValidateSubirFotoUsuario_Exito() {
+        String correo = "paseador@paseape.com";
+        Principal principal = () -> correo;
+        MultipartFile file = mock(MultipartFile.class);
+        Usuario usuario = Usuario.builder().id(10L).correo(correo).build();
+
+        when(usuarioRepository.findByCorreo(correo)).thenReturn(usuario);
+        when(storageValidator.validateUpload(file)).thenReturn(null);
+
+        ErrorDetailDto err = validator.validateSubirFotoUsuario(principal, file);
+
+        assertNull(err);
     }
 
     @Test

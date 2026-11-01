@@ -9,6 +9,7 @@ import com.paseape.apipaseape.domain.entity.DigitalDocument;
 import com.paseape.apipaseape.domain.entity.Mascota;
 import com.paseape.apipaseape.domain.entity.Usuario;
 import com.paseape.apipaseape.infrastructure.dto.response.ClienteResDto;
+import com.paseape.apipaseape.infrastructure.dto.response.DocumentUrlResDto;
 import com.paseape.apipaseape.infrastructure.dto.response.UsuarioResDto;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
 import com.paseape.apipaseape.infrastructure.mapper.dto.IClienteDtoMapper;
@@ -17,7 +18,9 @@ import com.paseape.apipaseape.infrastructure.mapper.dto.IUsuarioDtoMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.security.Principal;
 import java.util.List;
 
 import static com.paseape.apipaseape.infrastructure.constant.Constant.ID_DOC_FOTO_MASCOTA;
@@ -32,7 +35,6 @@ public class ClienteService {
     private final IClienteRepository clienteRepository;
     private final IUsuarioRepository usuarioRepository;
     private final IMascotaRepository mascotaRepository;
-    private final IDigitalDocumentRepository digitalDocumentRepository;
 
     private final IUsuarioDtoMapper usuarioDtoMapper;
     private final IClienteDtoMapper clienteDtoMapper;
@@ -56,6 +58,12 @@ public class ClienteService {
         usuarioResDto.setFotoPerfilUrl(digitalDocumentService.urlFotoPerfil(usuario));
 
         return usuarioResDto;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public DocumentUrlResDto subirFotoCliente(Principal principal, MultipartFile file) throws BadRequestException{
+        Usuario usuario = usuarioRepository.findByCorreo(principal.getName());
+        return digitalDocumentService.subirFotoUsuario(usuario, file);
     }
 
 }

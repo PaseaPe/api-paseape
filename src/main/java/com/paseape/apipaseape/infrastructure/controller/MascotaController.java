@@ -239,55 +239,26 @@ public class MascotaController extends BaseController {
         }
     }
 
-    @PostMapping("/{mascotaUuid}/fotos")
+    @PostMapping("/{mascotaUuid}/foto")
     public ResponseEntity<ResponseDto<DocumentUrlResDto>> subirFotoMascota(
             Principal principal,
             @PathVariable String mascotaUuid,
             @RequestParam("file") MultipartFile file) {
         var response = new ResponseDto<DocumentUrlResDto>();
+        Date startDatetime = Calendar.getInstance().getTime();
+
         try {
-            Date startDatetime = Calendar.getInstance().getTime();
-
-            if (principal == null || principal.getName() == null) {
+            ErrorDetailDto validationError = mascotaValidator.validateSubirFotoMascota(principal, mascotaUuid, file);
+            if (validationError != null) {
                 Date endDatetime = Calendar.getInstance().getTime();
-                response.setStatusCode(StatusCodes.Code401);
-                response.setCode(MessageCodes.ResponseCodeE01);
-                response.setMessage("No se encontro una sesion activa autenticada");
+                response.setStatusCode(validationError.getStatusCode());
+                response.setCode(validationError.getCode());
+                response.setMessage(validationError.getMessage());
                 response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
                 return ResponseEntity.status(response.getStatusCode()).body(response);
             }
 
-            Usuario usuario = mascotaService.obtenerUsuarioPorCorreo(principal.getName());
-            if (usuario == null) {
-                Date endDatetime = Calendar.getInstance().getTime();
-                response.setStatusCode(StatusCodes.Code404);
-                response.setCode(MessageCodes.ResponseCodeBR98);
-                response.setMessage("Usuario no encontrado");
-                response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
-                return ResponseEntity.status(response.getStatusCode()).body(response);
-            }
-
-            Cliente cliente = mascotaService.obtenerClientePorUsuarioId(usuario.getId());
-            if (cliente == null) {
-                Date endDatetime = Calendar.getInstance().getTime();
-                response.setStatusCode(StatusCodes.Code403);
-                response.setCode(MessageCodes.ResponseCodeBR04);
-                response.setMessage("El usuario no posee un perfil de cliente");
-                response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
-                return ResponseEntity.status(response.getStatusCode()).body(response);
-            }
-
-            ErrorDetailDto fileError = storageValidator.validateUpload(file);
-            if (fileError != null) {
-                Date endDatetime = Calendar.getInstance().getTime();
-                response.setStatusCode(fileError.getStatusCode());
-                response.setCode(fileError.getCode());
-                response.setMessage(fileError.getMessage());
-                response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
-                return ResponseEntity.status(response.getStatusCode()).body(response);
-            }
-
-            DocumentUrlResDto docDto = digitalDocumentService.subirFotoMascota(mascotaUuid, cliente.getId(), file);
+            DocumentUrlResDto docDto = mascotaService.subirFotoMascota(principal, mascotaUuid, file);
 
             Date endDatetime = Calendar.getInstance().getTime();
             HeaderDto headerDto = requestService.getResponseHeader(startDatetime, endDatetime);
@@ -305,7 +276,7 @@ public class MascotaController extends BaseController {
             response.setStatusCode(StatusCodes.Code400);
             response.setCode(ex.code != null ? ex.code : MessageCodes.ResponseCodeBR01);
             response.setMessage(ex.getMessage());
-            response.setHeader(requestService.getResponseHeader(Calendar.getInstance().getTime(), endDatetime));
+            response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
             return ResponseEntity.status(StatusCodes.Code400).body(response);
         } catch (Exception ex) {
             String method = new Object() {}.getClass().getEnclosingMethod().getName();
@@ -314,7 +285,7 @@ public class MascotaController extends BaseController {
             response.setStatusCode(StatusCodes.Code500);
             response.setCode(MessageCodes.ResponseCodeE99);
             response.setMessage("Error interno al subir la foto de la mascota");
-            response.setHeader(requestService.getResponseHeader(Calendar.getInstance().getTime(), endDatetime));
+            response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
             return ResponseEntity.status(StatusCodes.Code500).body(response);
         }
     }
