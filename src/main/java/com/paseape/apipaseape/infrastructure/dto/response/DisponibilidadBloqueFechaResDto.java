@@ -8,11 +8,13 @@ import lombok.Setter;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.annotation.JsonNaming;
 
+import java.util.List;
+
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class DisponibilidadBloqueFechaResDto {
 
@@ -26,4 +28,5 @@ public class DisponibilidadBloqueFechaResDto {
     private Boolean estaLleno;
     private Boolean disponible;
     private String motivoNoDisponible;
+    private List<MascotaResDto> mascotas;
 }

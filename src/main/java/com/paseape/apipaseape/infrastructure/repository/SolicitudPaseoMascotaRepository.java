@@ -9,6 +9,7 @@ import com.paseape.apipaseape.infrastructure.entity.SolicitudPaseoMascotaEntity;
 import com.paseape.apipaseape.infrastructure.mapper.entity.ISolicitudPaseoMascotaDboMapper;
 import com.paseape.apipaseape.infrastructure.repository.jpa.ISolicitudPaseoMascotaJpaRepository;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Repository
@@ -64,6 +65,16 @@ public class SolicitudPaseoMascotaRepository implements ISolicitudPaseoMascotaRe
             return List.of();
         }
         List<SolicitudPaseoMascotaEntity> entities = jpaRepository.findAllBySolicitudPaseoIdInWithDetails(solicitudPaseoIds);
+        return mapper.toDomainList(entities);
+    }
+
+    @Override
+    public List<SolicitudPaseoMascota> findAllByPaseadorIdAndFechaProgramadaAndSolicitudPaseoEstadoId(
+            Long paseadorId,
+            LocalDate fechaProgramada,
+            Integer solicitudPaseoEstadoId) {
+        List<SolicitudPaseoMascotaEntity> entities = jpaRepository
+                .findAllByPaseadorIdAndFechaProgramadaAndSolicitudPaseoEstadoId(paseadorId, fechaProgramada, solicitudPaseoEstadoId);
         return mapper.toDomainList(entities);
     }
 }
