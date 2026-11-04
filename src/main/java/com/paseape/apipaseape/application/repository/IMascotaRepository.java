@@ -17,4 +17,6 @@ public interface IMascotaRepository {
     List<Mascota> findAllByEstado(Integer estado);
 
     Mascota save(Mascota mascota);
+
+    List<Mascota> findAll();
 }

@@ -26,4 +26,6 @@ public class ApplicationParameterResDto {
     private List<CatalogoItemResDto> generosMascota;
     private List<TipoTamanoMascotaItemResDto> tamanosMascota;
     private List<CatalogoItemResDto> nivelesEnergia;
+    private List<CatalogoItemResDto> diasSemana;
+    private List<CatalogoItemResDto> bloquesHorario;
 }

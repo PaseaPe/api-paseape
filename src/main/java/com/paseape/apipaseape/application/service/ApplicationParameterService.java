@@ -5,6 +5,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.paseape.apipaseape.application.repository.IBloqueHorarioRepository;
+import com.paseape.apipaseape.application.repository.IDiaSemanaRepository;
 import com.paseape.apipaseape.application.repository.IDistritoLimaRepository;
 import com.paseape.apipaseape.application.repository.ITipoDocumentoRepository;
 import com.paseape.apipaseape.application.repository.ITipoGeneroMascotaRepository;
@@ -13,6 +15,8 @@ import com.paseape.apipaseape.application.repository.ITipoNivelEnergiaRepository
 import com.paseape.apipaseape.application.repository.ITipoRazaRepository;
 import com.paseape.apipaseape.application.repository.ITipoTamanoMascotaRepository;
 import com.paseape.apipaseape.application.repository.ITipoUsuarioRepository;
+import com.paseape.apipaseape.domain.entity.BloqueHorario;
+import com.paseape.apipaseape.domain.entity.DiaSemana;
 import com.paseape.apipaseape.domain.entity.TipoRaza;
 import com.paseape.apipaseape.domain.entity.TipoUsuario;
 import com.paseape.apipaseape.infrastructure.dto.response.parameter.ApplicationParameterResDto;
@@ -39,7 +43,10 @@ public class ApplicationParameterService {
     private final ITipoTamanoMascotaRepository tipoTamanoMascotaRepository;
     private final ITipoNivelEnergiaRepository tipoNivelEnergiaRepository;
     private final ITipoGeneroMascotaRepository tipoGeneroMascotaRepository;
+    private final IDiaSemanaRepository diaSemanaRepository;
+    private final IBloqueHorarioRepository bloqueHorarioRepository;
     private final IApplicationParameterDtoMapper parameterDtoMapper;
+
 
     @Transactional(readOnly = true)
     public ApplicationParameterResDto getAllParameters() {
@@ -77,5 +84,16 @@ public class ApplicationParameterService {
         }
         List<TipoRaza> razas = tipoRazaRepository.findAllByTipoMascotaIdAndEstado(tipoMascotaId, ESTADO_LOGICO_ACTIVO);
         return parameterDtoMapper.toTipoRazaDtoList(razas);
+    }
+
+    @Transactional(readOnly = true)
+    public ApplicationParameterResDto getHorarioParameters() {
+        List<CatalogoItemResDto> diasSemanaDto = parameterDtoMapper.toDiaSemanaDtoList(diaSemanaRepository.findAllByEstado(true));
+        List<CatalogoItemResDto> bloquesHorarioDto = parameterDtoMapper.toBloqueHorarioDtoList(bloqueHorarioRepository.findAllByEstado(true));
+
+        return ApplicationParameterResDto.builder()
+                .diasSemana(diasSemanaDto)
+                .bloquesHorario(bloquesHorarioDto)
+                .build();
     }
 }

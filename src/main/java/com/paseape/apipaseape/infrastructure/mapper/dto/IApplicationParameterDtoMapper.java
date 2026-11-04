@@ -4,11 +4,18 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 
+import com.paseape.apipaseape.domain.entity.BloqueHorario;
+import com.paseape.apipaseape.domain.entity.DiaSemana;
 import com.paseape.apipaseape.domain.entity.DistritoLima;
+import com.paseape.apipaseape.domain.entity.SolicitudPaseoEstado;
 import com.paseape.apipaseape.domain.entity.TipoDocumento;
+import com.paseape.apipaseape.domain.entity.TipoDuracionPaseo;
 import com.paseape.apipaseape.domain.entity.TipoGeneroMascota;
 import com.paseape.apipaseape.domain.entity.TipoMascota;
+import com.paseape.apipaseape.domain.entity.TipoMetodoPago;
+import com.paseape.apipaseape.domain.entity.TipoModalidadPaseo;
 import com.paseape.apipaseape.domain.entity.TipoNivelEnergia;
+import com.paseape.apipaseape.domain.entity.TipoNotificacion;
 import com.paseape.apipaseape.domain.entity.TipoRaza;
 import com.paseape.apipaseape.domain.entity.TipoTamanoMascota;
 import com.paseape.apipaseape.domain.entity.TipoUsuario;
@@ -47,4 +54,26 @@ public interface IApplicationParameterDtoMapper {
 
     CatalogoItemResDto toCatalogoItemResDto(TipoNivelEnergia entity);
     List<CatalogoItemResDto> toTipoNivelEnergiaDtoList(List<TipoNivelEnergia> entities);
+
+    CatalogoItemResDto toCatalogoItemResDto(DiaSemana entity);
+    List<CatalogoItemResDto> toDiaSemanaDtoList(List<DiaSemana> entities);
+
+    @Mapping(target = "descripcion", source = "codigo")
+    CatalogoItemResDto toCatalogoItemResDto(BloqueHorario entity);
+    List<CatalogoItemResDto> toBloqueHorarioDtoList(List<BloqueHorario> entities);
+
+    CatalogoItemResDto toCatalogoItemResDto(TipoDuracionPaseo entity);
+    List<CatalogoItemResDto> toTipoDuracionPaseoDtoList(List<TipoDuracionPaseo> entities);
+
+    CatalogoItemResDto toCatalogoItemResDto(TipoModalidadPaseo entity);
+    List<CatalogoItemResDto> toTipoModalidadPaseoDtoList(List<TipoModalidadPaseo> entities);
+
+    CatalogoItemResDto toCatalogoItemResDto(TipoMetodoPago entity);
+    List<CatalogoItemResDto> toTipoMetodoPagoDtoList(List<TipoMetodoPago> entities);
+
+    CatalogoItemResDto toCatalogoItemResDto(SolicitudPaseoEstado entity);
+    List<CatalogoItemResDto> toSolicitudPaseoEstadoDtoList(List<SolicitudPaseoEstado> entities);
+
+    CatalogoItemResDto toCatalogoItemResDto(TipoNotificacion entity);
+    List<CatalogoItemResDto> toTipoNotificacionDtoList(List<TipoNotificacion> entities);
 }

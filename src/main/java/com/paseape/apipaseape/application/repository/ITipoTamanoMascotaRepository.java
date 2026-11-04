@@ -15,4 +15,6 @@ public interface ITipoTamanoMascotaRepository {
     List<TipoTamanoMascota> findAllByEstado(Integer estado);
 
     TipoTamanoMascota save(TipoTamanoMascota tipoTamanoMascota);
+
+    List<TipoTamanoMascota> findAll();
 }

@@ -52,6 +52,12 @@ public class TipoUsuarioRepository implements ITipoUsuarioRepository {
     }
 
     @Override
+    public List<TipoUsuario> findAll() {
+        List<TipoUsuarioEntity> entities = jpaRepository.findAll();
+        return mapper.toDomainList(entities);
+    }
+
+    @Override
     public TipoUsuario save(TipoUsuario tipoUsuario) {
         TipoUsuarioEntity entity = mapper.toEntity(tipoUsuario);
         TipoUsuarioEntity savedEntity = jpaRepository.save(entity);

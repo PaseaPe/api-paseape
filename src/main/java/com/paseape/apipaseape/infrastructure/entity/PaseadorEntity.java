@@ -65,6 +65,9 @@ public class PaseadorEntity extends Auditable {
     @Column(name = "calificacion_promedio", precision = 3, scale = 2, nullable = false)
     private BigDecimal calificacionPromedio;
 
+    @Column(name = "max_mascotas_predeterminado", nullable = false)
+    private Integer maxMascotasPredeterminado;
+
     @Column(name = "estado", nullable = false)
     private Integer estado;
 }

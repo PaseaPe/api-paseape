@@ -1,5 +1,6 @@
 package com.paseape.apipaseape.infrastructure.validator;
 
+import com.paseape.apipaseape.application.service.ApisPeruService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -24,12 +25,16 @@ import static com.paseape.apipaseape.infrastructure.constant.Constant.*;
 public class AuthValidator {
 
     private final MascotaValidator mascotaValidator;
+    private final ApisPeruService apisPeruService;
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+    private static final Pattern DNI_PATTERN = Pattern.compile(REGEX_DNI);
+    private static final Pattern CE_PATTERN = Pattern.compile(REGEX_CARNET_EXTRANJERIA);
+    private static final Pattern PASAPORTE_PATTERN = Pattern.compile(REGEX_PASAPORTE);
+
     private static final int MIN_CONTRASENA_LENGTH = 6;
     private static final int MAX_CONTRASENA_LENGTH = 50;
     private static final int MAX_NOMBRE_APELLIDO_LENGTH = 100;
-    private static final int MAX_DOCUMENTO_LENGTH = 20;
 
     public ErrorDetailDto validateGoogleAuthRequest(GoogleAuthReqDto request) {
         if (request == null) {
@@ -151,9 +156,44 @@ public class AuthValidator {
             if (request.getTipoDocumentoId() == null || request.getTipoDocumentoId() <= 0) {
                 return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El tipo de documento es obligatorio para el perfil paseador.");
             }
-            if (!StringUtils.hasText(request.getNumeroDocumento()) || request.getNumeroDocumento().trim().length() > MAX_DOCUMENTO_LENGTH) {
-                return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El numero de documento es obligatorio y no debe superar 20 caracteres.");
+
+            if (request.getTipoDocumentoId() != ID_DNI &&
+                request.getTipoDocumentoId() != ID_CARNET_EXTRANJERIA &&
+                request.getTipoDocumentoId() != ID_PASAPORTE) {
+                return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR02, "Tipo de documento no soportado. Tipos validos: 1 (DNI), 2 (CARNET_EXTRANJERIA), 3 (PASAPORTE).");
             }
+
+            if (!StringUtils.hasText(request.getNumeroDocumento())) {
+                return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El numero de documento es obligatorio.");
+            }
+
+            String numDoc = request.getNumeroDocumento().trim();
+
+            if (request.getTipoDocumentoId() == ID_DNI) {
+                if (!DNI_PATTERN.matcher(numDoc).matches()) {
+                    return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El DNI debe contener exactamente " + LONGITUD_DNI + " digitos numericos.");
+                }
+                boolean existeDni = apisPeruService.existeDni(numDoc);
+                if (!existeDni) {
+                    return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El DNI ingresado no fue encontrado en RENIEC o no es valido.");
+                }
+                request.setNumeroDocumento(numDoc);
+            } else if (request.getTipoDocumentoId() == ID_CARNET_EXTRANJERIA) {
+                if (numDoc.length() == 8 && numDoc.matches("^[0-9]{8}$")) {
+                    numDoc = "0" + numDoc;
+                }
+                if (!CE_PATTERN.matcher(numDoc).matches()) {
+                    return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El Carnet de Extranjeria debe contener exactamente " + LONGITUD_CARNET_EXTRANJERIA + " digitos numericos.");
+                }
+                request.setNumeroDocumento(numDoc);
+            } else if (request.getTipoDocumentoId() == ID_PASAPORTE) {
+                numDoc = numDoc.toUpperCase();
+                if (!PASAPORTE_PATTERN.matcher(numDoc).matches()) {
+                    return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El Pasaporte debe contener exactamente " + LONGITUD_PASAPORTE + " caracteres alfanumericos.");
+                }
+                request.setNumeroDocumento(numDoc);
+            }
+
             if (request.getTarifaHoraPen() != null && request.getTarifaHoraPen().compareTo(BigDecimal.ZERO) < 0) {
                 return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "La tarifa por hora no puede ser negativa.");
             }

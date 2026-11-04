@@ -52,6 +52,12 @@ public class TipoDocumentoRepository implements ITipoDocumentoRepository {
     }
 
     @Override
+    public List<TipoDocumento> findAll() {
+        List<TipoDocumentoEntity> entities = jpaRepository.findAll();
+        return mapper.toDomainList(entities);
+    }
+
+    @Override
     public TipoDocumento save(TipoDocumento tipoDocumento) {
         TipoDocumentoEntity entity = mapper.toEntity(tipoDocumento);
         TipoDocumentoEntity savedEntity = jpaRepository.save(entity);

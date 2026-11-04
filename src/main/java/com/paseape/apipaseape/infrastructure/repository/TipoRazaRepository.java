@@ -70,6 +70,12 @@ public class TipoRazaRepository implements ITipoRazaRepository {
     }
 
     @Override
+    public List<TipoRaza> findAll() {
+        List<TipoRazaEntity> entities = jpaRepository.findAll();
+        return mapper.toDomainList(entities);
+    }
+
+    @Override
     public TipoRaza save(TipoRaza tipoRaza) {
         TipoRazaEntity entity = mapper.toEntity(tipoRaza);
         TipoRazaEntity savedEntity = jpaRepository.save(entity);
