@@ -16,6 +16,7 @@ import com.paseape.apipaseape.infrastructure.dto.response.parameter.ApplicationP
 import com.paseape.apipaseape.infrastructure.dto.response.parameter.TipoRazaItemResDto;
 import com.paseape.apipaseape.infrastructure.shared.RequestService;
 
+import com.paseape.apipaseape.infrastructure.dto.response.parameter.CatalogoItemResDto;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -81,6 +82,35 @@ public class ApplicationParameterController extends BaseController {
             response.setStatusCode(StatusCodes.Code500);
             response.setCode(MessageCodes.ResponseCodeE99);
             response.setMessage("Error interno al recuperar las razas filtradas");
+            response.setHeader(requestService.getResponseHeader(Calendar.getInstance().getTime(), endDatetime));
+            return ResponseEntity.status(StatusCodes.Code500).body(response);
+        }
+    }
+
+    @GetMapping("/horario")
+    public ResponseEntity<ResponseDto<ApplicationParameterResDto>> getHorarioParameters() {
+        var response = new ResponseDto<ApplicationParameterResDto>();
+        try {
+            Date startDatetime = Calendar.getInstance().getTime();
+
+            ApplicationParameterResDto data = applicationParameterService.getHorarioParameters();
+
+            Date endDatetime = Calendar.getInstance().getTime();
+            HeaderDto headerDto = requestService.getResponseHeader(startDatetime, endDatetime);
+
+            response.setStatusCode(StatusCodes.Code200);
+            response.setCode(MessageCodes.ResponseCodeS00);
+            response.setMessage("Parámetros de horario recuperados exitosamente");
+            response.setHeader(headerDto);
+            response.setResponse(data);
+            return ResponseEntity.status(response.getStatusCode()).body(response);
+        } catch (Exception ex) {
+            String method = new Object() {}.getClass().getEnclosingMethod().getName();
+            logControllerError(logger, ex, this, method, "getAllParameters");
+            Date endDatetime = Calendar.getInstance().getTime();
+            response.setStatusCode(StatusCodes.Code500);
+            response.setCode(MessageCodes.ResponseCodeE99);
+            response.setMessage("Error interno al recuperar los parámetros de la aplicación");
             response.setHeader(requestService.getResponseHeader(Calendar.getInstance().getTime(), endDatetime));
             return ResponseEntity.status(StatusCodes.Code500).body(response);
         }

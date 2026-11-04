@@ -429,6 +429,7 @@ public class AuthService {
                     .estadoVerificacion(estadoVerificacion)
                     .paseosCompletados(0)
                     .calificacionPromedio(BigDecimal.ZERO)
+                    .maxMascotasPredeterminado(reqDto.getMaxMascotasPredeterminado() != null ? reqDto.getMaxMascotasPredeterminado() : 3)
                     .estado(ESTADO_LOGICO_ACTIVO)
                     .build();
 

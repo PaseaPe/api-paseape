@@ -26,6 +26,12 @@ public interface IPaseadorJpaRepository extends JpaRepository<PaseadorEntity, Lo
             @Param("estadoVerificacionId") Integer estadoVerificacionId
     );
 
+    @Query("SELECT p FROM PaseadorEntity p WHERE p.distritoCobertura.id IN :distritoIds AND p.estadoVerificacion.id = :estadoVerificacionId")
+    List<PaseadorEntity> findByDistritoCoberturaIdInAndEstadoVerificacionId(
+            @Param("distritoIds") List<Integer> distritoIds,
+            @Param("estadoVerificacionId") Integer estadoVerificacionId
+    );
+
     List<PaseadorEntity> findByEstadoVerificacionId(Integer estadoVerificacionId);
 
     List<PaseadorEntity> findByEstado(Integer estado);

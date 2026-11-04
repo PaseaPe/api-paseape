@@ -15,4 +15,6 @@ public interface ITipoDocumentoRepository {
     List<TipoDocumento> findAllByEstado(Integer estado);
 
     TipoDocumento save(TipoDocumento tipoDocumento);
+
+    List<TipoDocumento> findAll();
 }

@@ -15,4 +15,6 @@ public interface ITipoUsuarioRepository {
     List<TipoUsuario> findAllByEstado(Integer estado);
 
     TipoUsuario save(TipoUsuario tipoUsuario);
+
+    List<TipoUsuario> findAll();
 }

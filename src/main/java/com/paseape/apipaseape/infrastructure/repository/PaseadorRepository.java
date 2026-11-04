@@ -65,6 +65,19 @@ public class PaseadorRepository implements IPaseadorRepository {
     }
 
     @Override
+    public List<Paseador> findAllByDistritoCoberturaIds(List<Integer> distritoIds) {
+        if (distritoIds == null || distritoIds.isEmpty()) {
+            List<PaseadorEntity> entities = jpaRepository.findByEstadoVerificacionId(Constant.ID_APROBADO);
+            return mapper.toDomainList(entities);
+        }
+        List<PaseadorEntity> entities = jpaRepository.findByDistritoCoberturaIdInAndEstadoVerificacionId(
+                distritoIds,
+                Constant.ID_APROBADO
+        );
+        return mapper.toDomainList(entities);
+    }
+
+    @Override
     public List<Paseador> findAllByEstadoVerificacionId(Integer estadoVerificacionId) {
         if (estadoVerificacionId == null) {
             return List.of();

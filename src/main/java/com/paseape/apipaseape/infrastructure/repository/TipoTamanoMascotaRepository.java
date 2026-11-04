@@ -52,6 +52,12 @@ public class TipoTamanoMascotaRepository implements ITipoTamanoMascotaRepository
     }
 
     @Override
+    public List<TipoTamanoMascota> findAll() {
+        List<TipoTamanoMascotaEntity> entities = jpaRepository.findAll();
+        return mapper.toDomainList(entities);
+    }
+
+    @Override
     public TipoTamanoMascota save(TipoTamanoMascota tipoTamanoMascota) {
         TipoTamanoMascotaEntity entity = mapper.toEntity(tipoTamanoMascota);
         TipoTamanoMascotaEntity savedEntity = jpaRepository.save(entity);
