@@ -2,6 +2,7 @@ package com.paseape.apipaseape.application.repository;
 
 import com.paseape.apipaseape.domain.entity.SolicitudPaseoMascota;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface ISolicitudPaseoMascotaRepository {
@@ -15,4 +16,10 @@ public interface ISolicitudPaseoMascotaRepository {
     List<SolicitudPaseoMascota> findAllBySolicitudPaseoIdWithDetails(Long solicitudPaseoId);
 
     List<SolicitudPaseoMascota> findAllBySolicitudPaseoIdInWithDetails(List<Long> solicitudPaseoIds);
+
+    List<SolicitudPaseoMascota> findAllByPaseadorIdAndFechaProgramadaAndSolicitudPaseoEstadoId(
+            Long paseadorId,
+            LocalDate fechaProgramada,
+            Integer solicitudPaseoEstadoId
+    );
 }

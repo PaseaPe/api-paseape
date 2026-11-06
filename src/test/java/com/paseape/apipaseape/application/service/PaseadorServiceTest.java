@@ -3,17 +3,21 @@ package com.paseape.apipaseape.application.service;
 import com.paseape.apipaseape.application.repository.IDiaSemanaRepository;
 import com.paseape.apipaseape.application.repository.IDisponibilidadPaseadorRepository;
 import com.paseape.apipaseape.application.repository.IPaseadorRepository;
-import com.paseape.apipaseape.application.repository.ISolicitudPaseoRepository;
+import com.paseape.apipaseape.application.repository.ISolicitudPaseoMascotaRepository;
 import com.paseape.apipaseape.application.repository.IUsuarioRepository;
 import com.paseape.apipaseape.domain.entity.BloqueHorario;
 import com.paseape.apipaseape.domain.entity.DiaSemana;
 import com.paseape.apipaseape.domain.entity.DisponibilidadPaseador;
+import com.paseape.apipaseape.domain.entity.Mascota;
 import com.paseape.apipaseape.domain.entity.Paseador;
 import com.paseape.apipaseape.domain.entity.PaseadorEstadoVerificacion;
-import com.paseape.apipaseape.domain.entity.Usuario;
+import com.paseape.apipaseape.domain.entity.SolicitudPaseo;
+import com.paseape.apipaseape.domain.entity.SolicitudPaseoMascota;
 import com.paseape.apipaseape.infrastructure.constant.Constant;
 import com.paseape.apipaseape.infrastructure.dto.response.DisponibilidadPaseadorFechaResDto;
+import com.paseape.apipaseape.infrastructure.dto.response.MascotaResDto;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
+import com.paseape.apipaseape.infrastructure.mapper.dto.IMascotaDtoMapper;
 import com.paseape.apipaseape.infrastructure.mapper.dto.IDigitalDocumentDtoMapper;
 import com.paseape.apipaseape.infrastructure.mapper.dto.IPaseadorDtoMapper;
 import com.paseape.apipaseape.infrastructure.mapper.dto.IUsuarioDtoMapper;
@@ -27,8 +31,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -49,9 +53,11 @@ class PaseadorServiceTest {
     @Mock
     private IDisponibilidadPaseadorRepository disponibilidadRepository;
     @Mock
-    private ISolicitudPaseoRepository solicitudPaseoRepository;
+    private ISolicitudPaseoMascotaRepository solicitudPaseoMascotaRepository;
     @Mock
     private IDiaSemanaRepository diaSemanaRepository;
+    @Mock
+    private IMascotaDtoMapper mascotaDtoMapper;
 
     private PaseadorService service;
 
@@ -71,8 +77,9 @@ class PaseadorServiceTest {
                 usuarioDtoMapper,
                 digitalDocumentDtoMapper,
                 disponibilidadRepository,
-                solicitudPaseoRepository,
-                diaSemanaRepository
+                solicitudPaseoMascotaRepository,
+                diaSemanaRepository,
+                mascotaDtoMapper
         );
 
         paseadorAprobado = Paseador.builder()
@@ -129,7 +136,7 @@ class PaseadorServiceTest {
     }
 
     @Test
-    @DisplayName("obtenerDisponibilidadPorFecha - Éxito para fecha futura con cupos libres y cupos agotados")
+    @DisplayName("obtenerDisponibilidadPorFecha - Éxito para fecha futura con cupos libres y cupos agotados con mapeo de mascotas")
     void testObtenerDisponibilidadPorFecha_FechaFutura_Exito() throws BadRequestException {
         String uuid = paseadorAprobado.getUuid();
         LocalDate fechaFutura = LocalDate.now(ZoneId.of(Constant.ZONE_ID_LIMA)).plusDays(4);
@@ -178,10 +185,34 @@ class PaseadorServiceTest {
         when(disponibilidadRepository.findAllByPaseadorIdAndDiaSemanaId(paseadorAprobado.getId(), numeroDia))
                 .thenReturn(List.of(slot1, slot2));
 
-        // Bloque 1 tiene 1 ocupada (quedan 2 cupos)
-        // Bloque 2 tiene 3 ocupadas (quedan 0 cupos -> SIN_CUPOS)
-        when(solicitudPaseoRepository.countMascotasOcupadasAgrupadoPorBloque(eq(paseadorAprobado.getId()), eq(fechaFutura), anyList()))
-                .thenReturn(Map.of(1, 1, 2, 3));
+        SolicitudPaseo paseoB1 = SolicitudPaseo.builder().id(501L).bloqueHorario(bloque1).build();
+        SolicitudPaseo paseoB2 = SolicitudPaseo.builder().id(502L).bloqueHorario(bloque2).build();
+
+        Mascota m1 = Mascota.builder().id(11L).nombre("Rocky").build();
+        Mascota m2 = Mascota.builder().id(12L).nombre("Luna").build();
+        Mascota m3 = Mascota.builder().id(13L).nombre("Max").build();
+        Mascota m4 = Mascota.builder().id(14L).nombre("Bella").build();
+
+        SolicitudPaseoMascota spm1 = SolicitudPaseoMascota.builder().id(1L).solicitudPaseo(paseoB1).mascota(m1).build();
+        SolicitudPaseoMascota spm2 = SolicitudPaseoMascota.builder().id(2L).solicitudPaseo(paseoB2).mascota(m2).build();
+        SolicitudPaseoMascota spm3 = SolicitudPaseoMascota.builder().id(3L).solicitudPaseo(paseoB2).mascota(m3).build();
+        SolicitudPaseoMascota spm4 = SolicitudPaseoMascota.builder().id(4L).solicitudPaseo(paseoB2).mascota(m4).build();
+
+        when(solicitudPaseoMascotaRepository.findAllByPaseadorIdAndFechaProgramadaAndSolicitudPaseoEstadoId(
+                paseadorAprobado.getId(),
+                fechaFutura,
+                Constant.ID_ESTADO_SOLICITUD_ACEPTADA
+        )).thenReturn(List.of(spm1, spm2, spm3, spm4));
+
+        MascotaResDto resM1 = MascotaResDto.builder().id(11L).nombre("Rocky").build();
+        MascotaResDto resM2 = MascotaResDto.builder().id(12L).nombre("Luna").build();
+        MascotaResDto resM3 = MascotaResDto.builder().id(13L).nombre("Max").build();
+        MascotaResDto resM4 = MascotaResDto.builder().id(14L).nombre("Bella").build();
+
+        when(mascotaDtoMapper.toResDto(m1)).thenReturn(resM1);
+        when(mascotaDtoMapper.toResDto(m2)).thenReturn(resM2);
+        when(mascotaDtoMapper.toResDto(m3)).thenReturn(resM3);
+        when(mascotaDtoMapper.toResDto(m4)).thenReturn(resM4);
 
         DisponibilidadPaseadorFechaResDto response = service.obtenerDisponibilidadPorFecha(uuid, fechaFutura);
 
@@ -203,6 +234,9 @@ class PaseadorServiceTest {
         assertFalse(b1.getEstaLleno());
         assertTrue(b1.getDisponible());
         assertNull(b1.getMotivoNoDisponible());
+        assertNotNull(b1.getMascotas());
+        assertEquals(1, b1.getMascotas().size());
+        assertEquals("Rocky", b1.getMascotas().get(0).getNombre());
 
         var b2 = response.getBloques().get(1);
         assertEquals(2, b2.getBloqueHorarioId());
@@ -213,10 +247,12 @@ class PaseadorServiceTest {
         assertTrue(b2.getEstaLleno());
         assertFalse(b2.getDisponible());
         assertEquals(Constant.MOTIVO_SIN_CUPOS, b2.getMotivoNoDisponible());
+        assertNotNull(b2.getMascotas());
+        assertEquals(3, b2.getMascotas().size());
     }
 
     @Test
-    @DisplayName("obtenerDisponibilidadPorFecha - Éxito para fecha de hoy con descarte de bloques expirados")
+    @DisplayName("obtenerDisponibilidadPorFecha - Éxito para fecha de hoy con descarte de bloques expirados y lista vacía de mascotas")
     void testObtenerDisponibilidadPorFecha_FechaHoy_HorarioExpirado() throws BadRequestException {
         String uuid = paseadorAprobado.getUuid();
         LocalDate hoyLima = LocalDate.now(ZoneId.of(Constant.ZONE_ID_LIMA));
@@ -226,7 +262,6 @@ class PaseadorServiceTest {
         when(diaSemanaRepository.findByNumeroDia(numeroDia))
                 .thenReturn(DiaSemana.builder().id(numeroDia).descripcion("HOY").numeroDia(numeroDia).build());
 
-        // Bloque en la madrugada ya expiró
         BloqueHorario bloqueMadrugada = BloqueHorario.builder()
                 .id(1)
                 .codigo("B00_01")
@@ -235,7 +270,6 @@ class PaseadorServiceTest {
                 .orden(1)
                 .build();
 
-        // Bloque tarde en la noche
         BloqueHorario bloqueNoche = BloqueHorario.builder()
                 .id(17)
                 .codigo("B23_24")
@@ -267,8 +301,11 @@ class PaseadorServiceTest {
         when(disponibilidadRepository.findAllByPaseadorIdAndDiaSemanaId(paseadorAprobado.getId(), numeroDia))
                 .thenReturn(List.of(slotMadrugada, slotNoche));
 
-        when(solicitudPaseoRepository.countMascotasOcupadasAgrupadoPorBloque(eq(paseadorAprobado.getId()), eq(hoyLima), anyList()))
-                .thenReturn(Map.of());
+        when(solicitudPaseoMascotaRepository.findAllByPaseadorIdAndFechaProgramadaAndSolicitudPaseoEstadoId(
+                paseadorAprobado.getId(),
+                hoyLima,
+                Constant.ID_ESTADO_SOLICITUD_ACEPTADA
+        )).thenReturn(Collections.emptyList());
 
         DisponibilidadPaseadorFechaResDto response = service.obtenerDisponibilidadPorFecha(uuid, hoyLima);
 
@@ -278,6 +315,8 @@ class PaseadorServiceTest {
         var bMadrugada = response.getBloques().get(0);
         assertFalse(bMadrugada.getDisponible());
         assertEquals(Constant.MOTIVO_HORARIO_EXPIRADO, bMadrugada.getMotivoNoDisponible());
+        assertNotNull(bMadrugada.getMascotas());
+        assertTrue(bMadrugada.getMascotas().isEmpty());
 
         var bNoche = response.getBloques().get(1);
         LocalTime ahoraLima = LocalTime.now(ZoneId.of(Constant.ZONE_ID_LIMA));
@@ -285,5 +324,7 @@ class PaseadorServiceTest {
             assertTrue(bNoche.getDisponible());
             assertNull(bNoche.getMotivoNoDisponible());
         }
+        assertNotNull(bNoche.getMascotas());
+        assertTrue(bNoche.getMascotas().isEmpty());
     }
 }
