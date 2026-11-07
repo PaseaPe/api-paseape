@@ -300,4 +300,25 @@ public class Constant {
     public static final String MSG_DESCARGA_FOTO_EXITOSA = "URL de documento generado exitosamente.";
     public static final String MSG_SUBIDA_ANTECEDENTES_EXITOSA = "Antecedentes policiales subidos exitosamente.";
     public static final String MSG_ELIMINAR_DOCUMENTO_EXITOSO = "Documento digital eliminado exitosamente.";
+
+    // =========================================================================
+    // TIPO ORIGEN TRAZA (SPRINT 3)
+    // =========================================================================
+    public static final int ID_ORIGEN_TRAZA_GPS_TIEMPO_REAL = 1;
+    public static final int ID_ORIGEN_TRAZA_RUTA_INTERPOLADA = 2;
+    public static final int ID_ORIGEN_TRAZA_CIERRE_ADMINISTRATIVO = 3;
+
+    public static final String ORIGEN_TRAZA_GPS_TIEMPO_REAL = "GPS_TIEMPO_REAL";
+    public static final String ORIGEN_TRAZA_RUTA_INTERPOLADA = "RUTA_INTERPOLADA";
+    public static final String ORIGEN_TRAZA_CIERRE_ADMINISTRATIVO = "CIERRE_ADMINISTRATIVO";
+
+    // =========================================================================
+    // TELEMETRÍA Y SEGUIMIENTO GPS (SPRINT 3 - HU26, HU24)
+    // =========================================================================
+    public static final String MSJ_PUNTOS_TELEMETRIA_PROCESADOS = "Puntos de telemetría procesados y acumulados correctamente";
+    public static final String MSJ_UBICACION_EN_VIVO_OBTENIDA = "Ubicación en tiempo real obtenida correctamente";
+    public static final String MSJ_ESPERA_PRIMERA_SENAL_GPS = "A la espera de la primera señal GPS del paseador";
+    public static final String MSJ_RECORRIDO_CONSOLIDADO_EXITO = "El paseo ha finalizado y el recorrido ha sido consolidado";
+    public static final String MSJ_RECORRIDO_OBTENIDO_EXITO = "Recorrido histórico del paseo obtenido exitosamente";
+    public static final String MSJ_ERROR_PASEO_NO_ACTIVO_GPS = "No se puede registrar telemetría porque el paseo no se encuentra en curso.";
 }
