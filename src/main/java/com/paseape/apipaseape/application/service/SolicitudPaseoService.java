@@ -11,6 +11,13 @@ import com.paseape.apipaseape.application.repository.ISolicitudPaseoDescarteRepo
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoMascotaRepository;
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoRepository;
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoUbicacionEnVivoRepository;
+import com.paseape.apipaseape.application.repository.ISolicitudPaseoRecorridoRepository;
+import com.paseape.apipaseape.domain.entity.SolicitudPaseoRecorrido;
+import com.paseape.apipaseape.infrastructure.dto.response.UbicacionEnVivoResDto;
+import com.paseape.apipaseape.infrastructure.dto.response.SolicitudPaseoRecorridoResDto;
+import com.paseape.apipaseape.infrastructure.mapper.dto.ISolicitudPaseoUbicacionEnVivoDtoMapper;
+import com.paseape.apipaseape.infrastructure.mapper.dto.ISolicitudPaseoRecorridoDtoMapper;
+import java.time.Duration;
 import com.paseape.apipaseape.domain.entity.SolicitudPaseoUbicacionEnVivo;
 import com.paseape.apipaseape.infrastructure.dto.request.RegistrarUbicacionesBatchReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.UbicacionPuntoReqDto;
@@ -88,6 +95,9 @@ public class SolicitudPaseoService {
     private final ISolicitudPaseoDescarteRepository solicitudPaseoDescarteRepository;
     private final ISolicitudPaseoDtoMapper solicitudPaseoDtoMapper;
     private final ISolicitudPaseoUbicacionEnVivoRepository solicitudPaseoUbicacionEnVivoRepository;
+    private final ISolicitudPaseoRecorridoRepository solicitudPaseoRecorridoRepository;
+    private final ISolicitudPaseoUbicacionEnVivoDtoMapper solicitudPaseoUbicacionEnVivoDtoMapper;
+    private final ISolicitudPaseoRecorridoDtoMapper solicitudPaseoRecorridoDtoMapper;
 
     @Transactional(rollbackFor = Exception.class)
     public SolicitudPaseoResDto crearSolicitudInmediata(String userEmail, CrearSolicitudInmediataReqDto reqDto) throws BadRequestException {
@@ -1238,5 +1248,39 @@ public class SolicitudPaseoService {
                 .puntosProcesados(puntos.size())
                 .paseoActivo(true)
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public UbicacionEnVivoResDto obtenerUbicacionEnVivo(String solicitudUuid) {
+        SolicitudPaseo solicitud = solicitudPaseoRepository.findByUuid(solicitudUuid.trim());
+        if (solicitud == null) {
+            return null;
+        }
+        SolicitudPaseoUbicacionEnVivo ubicacionEnVivo = solicitudPaseoUbicacionEnVivoRepository.findBySolicitudPaseoId(solicitud.getId());
+        if (ubicacionEnVivo == null) {
+            return null;
+        }
+        long retrasoSegundos = 0L;
+        if (ubicacionEnVivo.getFechaHoraGps() != null) {
+            retrasoSegundos = Math.abs(Duration.between(ubicacionEnVivo.getFechaHoraGps(), LocalDateTime.now(ZoneOffset.UTC)).getSeconds());
+        }
+        boolean senalDegradada = retrasoSegundos > 45;
+        return solicitudPaseoUbicacionEnVivoDtoMapper.toResDto(ubicacionEnVivo, senalDegradada);
+    }
+
+    @Transactional(readOnly = true)
+    public SolicitudPaseoRecorridoResDto obtenerRecorridoConsolidado(String solicitudUuid) throws BadRequestException {
+        SolicitudPaseo solicitud = solicitudPaseoRepository.findByUuidWithDetails(solicitudUuid.trim());
+        if (solicitud == null) {
+            solicitud = solicitudPaseoRepository.findByUuid(solicitudUuid.trim());
+        }
+        if (solicitud == null) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR98, "No se encontró la solicitud de paseo.");
+        }
+        SolicitudPaseoRecorrido recorrido = solicitudPaseoRecorridoRepository.findBySolicitudPaseoId(solicitud.getId());
+        if (recorrido == null) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR98, "No se encontró el recorrido histórico consolidado para este paseo.");
+        }
+        return solicitudPaseoRecorridoDtoMapper.toResDto(recorrido);
     }
 }

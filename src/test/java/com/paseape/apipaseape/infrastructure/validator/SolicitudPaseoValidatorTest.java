@@ -1,10 +1,19 @@
 package com.paseape.apipaseape.infrastructure.validator;
 
+import com.paseape.apipaseape.application.repository.IClienteRepository;
 import com.paseape.apipaseape.application.repository.IDistritoLimaRepository;
+import com.paseape.apipaseape.application.repository.IPaseadorRepository;
+import com.paseape.apipaseape.application.repository.ISolicitudPaseoRepository;
+import com.paseape.apipaseape.application.repository.IUsuarioRepository;
+import com.paseape.apipaseape.domain.entity.Cliente;
 import com.paseape.apipaseape.domain.entity.DistritoLima;
+import com.paseape.apipaseape.domain.entity.Paseador;
+import com.paseape.apipaseape.domain.entity.SolicitudPaseo;
+import com.paseape.apipaseape.domain.entity.SolicitudPaseoEstado;
+import com.paseape.apipaseape.domain.entity.Usuario;
+import com.paseape.apipaseape.infrastructure.constant.Constant;
 import com.paseape.apipaseape.infrastructure.constant.MessageCodes;
 import com.paseape.apipaseape.infrastructure.constant.StatusCodes;
-import com.paseape.apipaseape.infrastructure.dto.request.CancelarSolicitudReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.CrearSolicitudInmediataReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.CrearSolicitudProgramadaReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.RegistrarUbicacionesBatchReqDto;
@@ -31,12 +40,26 @@ class SolicitudPaseoValidatorTest {
 
     @Mock
     private IDistritoLimaRepository distritoLimaRepository;
+    @Mock
+    private IUsuarioRepository usuarioRepository;
+    @Mock
+    private IPaseadorRepository paseadorRepository;
+    @Mock
+    private IClienteRepository clienteRepository;
+    @Mock
+    private ISolicitudPaseoRepository solicitudPaseoRepository;
 
     private SolicitudPaseoValidator validator;
 
     @BeforeEach
     void setUp() {
-        validator = new SolicitudPaseoValidator(distritoLimaRepository);
+        validator = new SolicitudPaseoValidator(
+                distritoLimaRepository,
+                usuarioRepository,
+                paseadorRepository,
+                clienteRepository,
+                solicitudPaseoRepository
+        );
     }
 
     @Test
@@ -218,17 +241,11 @@ class SolicitudPaseoValidatorTest {
     void testValidateRegistrarUbicaciones() {
         String uuid = UUID.randomUUID().toString();
 
-        // 1. Email nulo o vacío
         assertNotNull(validator.validateRegistrarUbicaciones(null, uuid, null));
         assertNotNull(validator.validateRegistrarUbicaciones("   ", uuid, null));
-
-        // 2. Lote nulo
         assertNotNull(validator.validateRegistrarUbicaciones("paseador@paseape.com", uuid, null));
-
-        // 3. Lote vacío
         assertNotNull(validator.validateRegistrarUbicaciones("paseador@paseape.com", uuid, RegistrarUbicacionesBatchReqDto.builder().ubicaciones(List.of()).build()));
 
-        // 4. Punto válido
         var p = UbicacionPuntoReqDto.builder()
                 .latitud(BigDecimal.valueOf(-12.046374))
                 .longitud(BigDecimal.valueOf(-77.042793))
@@ -238,6 +255,87 @@ class SolicitudPaseoValidatorTest {
                 .rumboGrados(BigDecimal.valueOf(180.0))
                 .build();
         var reqValido = RegistrarUbicacionesBatchReqDto.builder().ubicaciones(List.of(p)).build();
+
+        when(usuarioRepository.findByCorreo("paseador@paseape.com")).thenReturn(Usuario.builder().id(10L).build());
+        when(paseadorRepository.findByUsuarioId(10L)).thenReturn(Paseador.builder().id(20L).estado(1).build());
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(
+                SolicitudPaseo.builder()
+                        .id(100L)
+                        .paseador(Paseador.builder().id(20L).build())
+                        .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_EN_CURSO))
+                        .build()
+        );
+
         assertNull(validator.validateRegistrarUbicaciones("paseador@paseape.com", uuid, reqValido));
+    }
+
+    @Test
+    @DisplayName("validateObtenerUbicacionEnVivo - Valida que el paseo esté en curso y pertenezca al cliente")
+    void testValidateObtenerUbicacionEnVivo() {
+        String uuid = UUID.randomUUID().toString();
+        String email = "cliente@paseape.com";
+
+        // 1. Email o UUID inválidos
+        assertNotNull(validator.validateObtenerUbicacionEnVivo(null, uuid));
+        assertNotNull(validator.validateObtenerUbicacionEnVivo(email, "invalid-uuid"));
+
+        // 2. Cliente no existe
+        when(usuarioRepository.findByCorreo(email)).thenReturn(Usuario.builder().id(5L).build());
+        when(clienteRepository.findByUsuarioId(5L)).thenReturn(null);
+        assertNotNull(validator.validateObtenerUbicacionEnVivo(email, uuid));
+
+        // 3. Solicitud no en curso (por ejemplo, ACEPTADA = 2)
+        when(clienteRepository.findByUsuarioId(5L)).thenReturn(Cliente.builder().id(15L).estado(1).build());
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(
+                SolicitudPaseo.builder()
+                        .id(100L)
+                        .cliente(Cliente.builder().id(15L).build())
+                        .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_ACEPTADA))
+                        .build()
+        );
+        ResponseDto<?> errNoIniciado = validator.validateObtenerUbicacionEnVivo(email, uuid);
+        assertNotNull(errNoIniciado);
+        assertTrue(errNoIniciado.getMessage().contains("no ha comenzado"));
+
+        // 4. Éxito cuando está en estado EN_CURSO (5)
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(
+                SolicitudPaseo.builder()
+                        .id(100L)
+                        .cliente(Cliente.builder().id(15L).build())
+                        .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_EN_CURSO))
+                        .build()
+        );
+        assertNull(validator.validateObtenerUbicacionEnVivo(email, uuid));
+    }
+
+    @Test
+    @DisplayName("validateObtenerRecorridoConsolidado - Valida autorización y estado finalizado")
+    void testValidateObtenerRecorridoConsolidado() {
+        String uuid = UUID.randomUUID().toString();
+        String email = "cliente@paseape.com";
+
+        when(usuarioRepository.findByCorreo(email)).thenReturn(Usuario.builder().id(5L).build());
+
+        // Solicitud no finalizada
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(
+                SolicitudPaseo.builder()
+                        .id(100L)
+                        .cliente(Cliente.builder().usuario(Usuario.builder().id(5L).build()).build())
+                        .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_EN_CURSO))
+                        .build()
+        );
+        ResponseDto<?> errNoFin = validator.validateObtenerRecorridoConsolidado(email, uuid);
+        assertNotNull(errNoFin);
+        assertTrue(errNoFin.getMessage().contains("finalizado"));
+
+        // Éxito cuando está finalizada
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(
+                SolicitudPaseo.builder()
+                        .id(100L)
+                        .cliente(Cliente.builder().usuario(Usuario.builder().id(5L).build()).build())
+                        .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_FINALIZADA))
+                        .build()
+        );
+        assertNull(validator.validateObtenerRecorridoConsolidado(email, uuid));
     }
 }

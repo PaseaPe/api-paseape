@@ -1,9 +1,11 @@
 package com.paseape.apipaseape.infrastructure.validator;
 
+import com.paseape.apipaseape.application.repository.IClienteRepository;
 import com.paseape.apipaseape.application.repository.IDistritoLimaRepository;
 import com.paseape.apipaseape.application.repository.IPaseadorRepository;
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoRepository;
 import com.paseape.apipaseape.application.repository.IUsuarioRepository;
+import com.paseape.apipaseape.domain.entity.Cliente;
 import com.paseape.apipaseape.domain.entity.DistritoLima;
 import com.paseape.apipaseape.domain.entity.Paseador;
 import com.paseape.apipaseape.domain.entity.SolicitudPaseo;
@@ -38,16 +40,17 @@ public class SolicitudPaseoValidator {
     private final IDistritoLimaRepository distritoLimaRepository;
     private final IUsuarioRepository usuarioRepository;
     private final IPaseadorRepository paseadorRepository;
+    private final IClienteRepository clienteRepository;
     private final ISolicitudPaseoRepository solicitudPaseoRepository;
 
     private static final Pattern UUID_PATTERN = Pattern.compile(Constant.REGEX_UUID);
 
     public SolicitudPaseoValidator(IDistritoLimaRepository distritoLimaRepository) {
-        this(distritoLimaRepository, null, null, null);
+        this(distritoLimaRepository, null, null, null, null);
     }
 
     public SolicitudPaseoValidator() {
-        this(null, null, null, null);
+        this(null, null, null, null, null);
     }
 
     public ResponseDto<?> validateCrearInmediata(CrearSolicitudInmediataReqDto reqDto) {
@@ -446,9 +449,6 @@ public class SolicitudPaseoValidator {
                 if (punto.getFechaHoraGps() == null) {
                     throw new BadRequestException("El campo 'fecha_hora_gps' es obligatorio en la posición " + i + ".");
                 }
-                /*if (punto.getFechaHoraGps().isAfter(maxFechaGpsPermitida)) {
-                    throw new BadRequestException("La marca de tiempo GPS en la posición " + i + " supera el umbral temporal máximo permitido.");
-                }*/
 
                 if (punto.getPrecisionM() != null && punto.getPrecisionM().compareTo(BigDecimal.ZERO) < 0) {
                     throw new BadRequestException("La precisión en metros no puede ser negativa en la posición " + i + ".");
@@ -474,6 +474,112 @@ public class SolicitudPaseoValidator {
 
     public ResponseDto<?> validateRegistrarUbicaciones(String uuid, RegistrarUbicacionesBatchReqDto reqDto) {
         return validateRegistrarUbicaciones("dummy@paseape.com", uuid, reqDto);
+    }
+
+    public ResponseDto<?> validateObtenerUbicacionEnVivo(String userEmail, String uuid) {
+        try {
+            if (ObjectUtils.isEmpty(userEmail) || userEmail.trim().isEmpty()) {
+                throw new BadRequestException(MessageCodes.ResponseCodeE01, "Usuario no autenticado.");
+            }
+
+            this.validateUuidInternal(uuid, "de la solicitud");
+
+            if (usuarioRepository != null && clienteRepository != null) {
+                Usuario usuario = usuarioRepository.findByCorreo(userEmail.trim().toLowerCase());
+                if (usuario == null) {
+                    throw new BadRequestException(MessageCodes.ResponseCodeBR98, "No se encontró el usuario autenticado.");
+                }
+
+                Cliente cliente = clienteRepository.findByUsuarioId(usuario.getId());
+                if (cliente == null) {
+                    throw new BadRequestException(MessageCodes.ResponseCodeBR03, "El usuario no cuenta con un perfil de cliente registrado.");
+                }
+
+                if (cliente.getEstado() != null && cliente.getEstado() != Constant.ESTADO_LOGICO_ACTIVO) {
+                    throw new BadRequestException(MessageCodes.ResponseCodeBR04, "El cliente no se encuentra activo.");
+                }
+
+                if (solicitudPaseoRepository != null) {
+                    SolicitudPaseo solicitud = solicitudPaseoRepository.findByUuidWithDetails(uuid.trim());
+                    if (solicitud == null) {
+                        solicitud = solicitudPaseoRepository.findByUuid(uuid.trim());
+                    }
+                    if (solicitud == null) {
+                        throw new BadRequestException(MessageCodes.ResponseCodeBR98, "No se encontró la solicitud de paseo.");
+                    }
+
+                    if (solicitud.getCliente() == null || !cliente.getId().equals(solicitud.getCliente().getId())) {
+                        throw new BadRequestException(MessageCodes.ResponseCodeBR03, "La solicitud no pertenece al cliente autenticado.");
+                    }
+
+                    if (solicitud.getSolicitudPaseoEstado() != null) {
+                        int estadoId = solicitud.getSolicitudPaseoEstado().getId();
+                        if (estadoId < Constant.ID_ESTADO_SOLICITUD_EN_CURSO) {
+                            throw new BadRequestException(MessageCodes.ResponseCodeBR03, "El paseo aún no ha comenzado.");
+                        } else if (estadoId == Constant.ID_ESTADO_SOLICITUD_FINALIZADA) {
+                            throw new BadRequestException(MessageCodes.ResponseCodeBR03, "El paseo ya ha finalizado. Consulta el recorrido histórico consolidado.");
+                        } else if (estadoId != Constant.ID_ESTADO_SOLICITUD_EN_CURSO) {
+                            throw new BadRequestException(MessageCodes.ResponseCodeBR03, "La solicitud no se encuentra en curso.");
+                        }
+                    }
+                }
+            }
+        } catch (BadRequestException brex) {
+            return BuildErrorForValidation(
+                    brex.statusCode != null ? brex.statusCode : StatusCodes.Code400,
+                    brex.code != null ? brex.code : MessageCodes.ResponseCodeBR01,
+                    brex.getMessage()
+            );
+        }
+        return null;
+    }
+
+    public ResponseDto<?> validateObtenerRecorridoConsolidado(String userEmail, String uuid) {
+        try {
+            if (ObjectUtils.isEmpty(userEmail) || userEmail.trim().isEmpty()) {
+                throw new BadRequestException(MessageCodes.ResponseCodeE01, "Usuario no autenticado.");
+            }
+
+            this.validateUuidInternal(uuid, "de la solicitud");
+
+            if (usuarioRepository != null && solicitudPaseoRepository != null) {
+                Usuario usuario = usuarioRepository.findByCorreo(userEmail.trim().toLowerCase());
+                if (usuario == null) {
+                    throw new BadRequestException(MessageCodes.ResponseCodeBR98, "No se encontró el usuario autenticado.");
+                }
+
+                SolicitudPaseo solicitud = solicitudPaseoRepository.findByUuidWithDetails(uuid.trim());
+                if (solicitud == null) {
+                    solicitud = solicitudPaseoRepository.findByUuid(uuid.trim());
+                }
+                if (solicitud == null) {
+                    throw new BadRequestException(MessageCodes.ResponseCodeBR98, "No se encontró la solicitud de paseo.");
+                }
+
+                boolean esCliente = solicitud.getCliente() != null && solicitud.getCliente().getUsuario() != null
+                        && usuario.getId().equals(solicitud.getCliente().getUsuario().getId());
+                boolean esPaseador = solicitud.getPaseador() != null && solicitud.getPaseador().getUsuario() != null
+                        && usuario.getId().equals(solicitud.getPaseador().getUsuario().getId());
+                boolean esAdmin = usuario.getTipoUsuario() != null
+                        && Integer.valueOf(Constant.ID_ADMINISTRADOR).equals(usuario.getTipoUsuario().getId());
+
+                if (!esCliente && !esPaseador && !esAdmin) {
+                    throw new BadRequestException(MessageCodes.ResponseCodeBR03, "No tiene permisos para consultar el recorrido de esta solicitud.");
+                }
+
+                if (solicitud.getSolicitudPaseoEstado() == null
+                        || !Integer.valueOf(Constant.ID_ESTADO_SOLICITUD_FINALIZADA).equals(solicitud.getSolicitudPaseoEstado().getId())) {
+                    throw new BadRequestException(MessageCodes.ResponseCodeBR03, "El recorrido solo puede consultarse cuando el paseo ha finalizado.");
+                }
+            }
+        } catch (BadRequestException brex) {
+            return BuildErrorForValidation(
+                    brex.statusCode != null ? brex.statusCode : StatusCodes.Code400,
+                    brex.code != null ? brex.code : MessageCodes.ResponseCodeBR01,
+                    brex.getMessage()
+            );
+        }
+        return null;
     }
 
     public ResponseDto<?> validateUuid(String uuid, String nombreCampo) {

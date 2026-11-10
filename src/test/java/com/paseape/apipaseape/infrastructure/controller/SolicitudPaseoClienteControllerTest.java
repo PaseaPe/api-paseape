@@ -225,4 +225,54 @@ class SolicitudPaseoClienteControllerTest {
         assertEquals(MessageCodes.ResponseCodeBR03, responseEntity.getBody().getCode());
         assertTrue(responseEntity.getBody().getMessage().contains("no cuenta con cupo suficiente"));
     }
+
+    @Test
+    @DisplayName("obtenerUbicacionActual - Éxito con coordenadas en vivo retorna 200")
+    void testObtenerUbicacionActual_Exito() throws BadRequestException {
+        String uuid = UUID.randomUUID().toString();
+        var ubicacionDto = com.paseape.apipaseape.infrastructure.dto.response.UbicacionEnVivoResDto.builder()
+                .uuid(UUID.randomUUID().toString())
+                .solicitudPaseoUuid(uuid)
+                .latitud(BigDecimal.valueOf(-12.1025))
+                .longitud(BigDecimal.valueOf(-76.9880))
+                .senalDegradada(false)
+                .build();
+
+        when(solicitudPaseoValidator.validateObtenerUbicacionEnVivo("cliente@paseape.com", uuid)).thenReturn(null);
+        when(solicitudPaseoService.obtenerUbicacionEnVivo(uuid)).thenReturn(ubicacionDto);
+
+        ResponseEntity<ResponseDto<com.paseape.apipaseape.infrastructure.dto.response.UbicacionEnVivoResDto>> responseEntity = controller.obtenerUbicacionActual(
+                mockPrincipal,
+                null,
+                uuid
+        );
+
+        assertNotNull(responseEntity);
+        assertEquals(StatusCodes.Code200, responseEntity.getStatusCode().value());
+        assertEquals(MessageCodes.ResponseCodeS00, responseEntity.getBody().getCode());
+        assertEquals(Constant.MSJ_UBICACION_EN_VIVO_OBTENIDA, responseEntity.getBody().getMessage());
+        assertNotNull(responseEntity.getBody().getResponse());
+        assertEquals(BigDecimal.valueOf(-12.1025), responseEntity.getBody().getResponse().getLatitud());
+    }
+
+    @Test
+    @DisplayName("obtenerUbicacionActual - Espera de primera señal GPS retorna 200 con response null")
+    void testObtenerUbicacionActual_EsperaPrimeraSenal() throws BadRequestException {
+        String uuid = UUID.randomUUID().toString();
+
+        when(solicitudPaseoValidator.validateObtenerUbicacionEnVivo("cliente@paseape.com", uuid)).thenReturn(null);
+        when(solicitudPaseoService.obtenerUbicacionEnVivo(uuid)).thenReturn(null);
+
+        ResponseEntity<ResponseDto<com.paseape.apipaseape.infrastructure.dto.response.UbicacionEnVivoResDto>> responseEntity = controller.obtenerUbicacionActual(
+                mockPrincipal,
+                null,
+                uuid
+        );
+
+        assertNotNull(responseEntity);
+        assertEquals(StatusCodes.Code200, responseEntity.getStatusCode().value());
+        assertEquals(MessageCodes.ResponseCodeS00, responseEntity.getBody().getCode());
+        assertEquals(Constant.MSJ_ESPERA_PRIMERA_SENAL_GPS, responseEntity.getBody().getMessage());
+        assertNull(responseEntity.getBody().getResponse());
+    }
 }
