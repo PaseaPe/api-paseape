@@ -4,7 +4,6 @@ import com.paseape.apipaseape.application.service.SolicitudPaseoService;
 import com.paseape.apipaseape.infrastructure.constant.Constant;
 import com.paseape.apipaseape.infrastructure.constant.MessageCodes;
 import com.paseape.apipaseape.infrastructure.constant.StatusCodes;
-import com.paseape.apipaseape.infrastructure.dto.response.ErrorDetailDto;
 import com.paseape.apipaseape.infrastructure.dto.response.HeaderDto;
 import com.paseape.apipaseape.infrastructure.dto.response.ResponseDto;
 import com.paseape.apipaseape.infrastructure.dto.response.SolicitudPaseoResDto;
@@ -87,7 +86,7 @@ class SolicitudPaseoPaseadorControllerTest {
                 .estadoId(Constant.ID_ESTADO_SOLICITUD_ACEPTADA)
                 .build();
 
-        when(solicitudPaseoValidator.validarUuid(uuid, "uuid")).thenReturn(null);
+        when(solicitudPaseoValidator.validateTomarSolicitudInmediata(uuid)).thenReturn(null);
         when(solicitudPaseoService.tomarSolicitudInmediata("paseador@paseape.com", uuid)).thenReturn(resDto);
 
         ResponseEntity<ResponseDto<SolicitudPaseoResDto>> responseEntity = controller.tomarSolicitudInmediata(
@@ -107,13 +106,12 @@ class SolicitudPaseoPaseadorControllerTest {
     @DisplayName("tomarSolicitudInmediata - Falla de validación de UUID retorna 400 sin invocar servicio")
     void testTomarSolicitudInmediata_InvalidUuid() throws BadRequestException {
         String invalidUuid = "not-a-valid-uuid";
-        ErrorDetailDto valErr = ErrorDetailDto.builder()
-                .statusCode(StatusCodes.Code400)
-                .code(MessageCodes.ResponseCodeBR01)
-                .message("El formato del identificador uuid no es válido.")
-                .build();
+        var valErr = new ResponseDto<>();
+        valErr.setStatusCode(StatusCodes.Code400);
+        valErr.setCode(MessageCodes.ResponseCodeBR01);
+        valErr.setMessage("El identificador de la solicitud no tiene un formato UUID válido.");
 
-        when(solicitudPaseoValidator.validarUuid(invalidUuid, "uuid")).thenReturn(valErr);
+        when(solicitudPaseoValidator.validateTomarSolicitudInmediata(invalidUuid)).thenReturn(valErr);
 
         ResponseEntity<ResponseDto<SolicitudPaseoResDto>> responseEntity = controller.tomarSolicitudInmediata(
                 mockPrincipal,
@@ -134,7 +132,7 @@ class SolicitudPaseoPaseadorControllerTest {
     void testTomarSolicitudInmediata_AlreadyTaken() throws BadRequestException {
         String uuid = UUID.randomUUID().toString();
 
-        when(solicitudPaseoValidator.validarUuid(uuid, "uuid")).thenReturn(null);
+        when(solicitudPaseoValidator.validateTomarSolicitudInmediata(uuid)).thenReturn(null);
         when(solicitudPaseoService.tomarSolicitudInmediata("paseador@paseape.com", uuid))
                 .thenThrow(new BadRequestException(MessageCodes.ResponseCodeBR03, Constant.MSJ_ERROR_SOLICITUD_NO_DISPONIBLE));
 

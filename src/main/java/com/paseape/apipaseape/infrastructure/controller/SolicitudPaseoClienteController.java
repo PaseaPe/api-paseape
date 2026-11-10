@@ -7,7 +7,10 @@ import com.paseape.apipaseape.infrastructure.constant.StatusCodes;
 import com.paseape.apipaseape.infrastructure.dto.request.CancelarSolicitudReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.CrearSolicitudInmediataReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.CrearSolicitudProgramadaReqDto;
-import com.paseape.apipaseape.infrastructure.dto.response.*;
+import com.paseape.apipaseape.infrastructure.dto.response.HeaderDto;
+import com.paseape.apipaseape.infrastructure.dto.response.PageResponseDto;
+import com.paseape.apipaseape.infrastructure.dto.response.ResponseDto;
+import com.paseape.apipaseape.infrastructure.dto.response.SolicitudPaseoResDto;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
 import com.paseape.apipaseape.infrastructure.security.JwtTokenProvider;
 import com.paseape.apipaseape.infrastructure.shared.RequestService;
@@ -40,7 +43,7 @@ public class SolicitudPaseoClienteController extends BaseController {
         var response = new ResponseDto<SolicitudPaseoResDto>();
         Date startDatetime = Calendar.getInstance().getTime();
         try {
-            ErrorDetailDto validationError = solicitudPaseoValidator.validarCrearSolicitudInmediata(reqDto);
+            ResponseDto<?> validationError = solicitudPaseoValidator.validateCrearInmediata(reqDto);
             if (validationError != null) {
                 Date endDatetime = Calendar.getInstance().getTime();
                 response.setStatusCode(validationError.getStatusCode());
@@ -92,7 +95,7 @@ public class SolicitudPaseoClienteController extends BaseController {
         var response = new ResponseDto<SolicitudPaseoResDto>();
         Date startDatetime = Calendar.getInstance().getTime();
         try {
-            ErrorDetailDto validationError = solicitudPaseoValidator.validarCrearSolicitudProgramada(reqDto);
+            ResponseDto<?> validationError = solicitudPaseoValidator.validateCrearProgramada(reqDto);
             if (validationError != null) {
                 Date endDatetime = Calendar.getInstance().getTime();
                 response.setStatusCode(validationError.getStatusCode());
@@ -146,7 +149,7 @@ public class SolicitudPaseoClienteController extends BaseController {
         var response = new ResponseDto<PageResponseDto<SolicitudPaseoResDto>>();
         Date startDatetime = Calendar.getInstance().getTime();
         try {
-            ErrorDetailDto validationError = solicitudPaseoValidator.validarConsultaBandejaCliente(tab, page, size);
+            ResponseDto<?> validationError = solicitudPaseoValidator.validateConsultaBandejaCliente(tab, page, size);
             if (validationError != null) {
                 Date endDatetime = Calendar.getInstance().getTime();
                 response.setStatusCode(validationError.getStatusCode());
@@ -199,22 +202,12 @@ public class SolicitudPaseoClienteController extends BaseController {
         var response = new ResponseDto<SolicitudPaseoResDto>();
         Date startDatetime = Calendar.getInstance().getTime();
         try {
-            ErrorDetailDto validationError = solicitudPaseoValidator.validarUuid(uuid, "uuid");
+            ResponseDto<?> validationError = solicitudPaseoValidator.validateCancelarSolicitudCliente(uuid, reqDto);
             if (validationError != null) {
                 Date endDatetime = Calendar.getInstance().getTime();
                 response.setStatusCode(validationError.getStatusCode());
                 response.setCode(validationError.getCode());
                 response.setMessage(validationError.getMessage());
-                response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
-                return ResponseEntity.status(response.getStatusCode()).body(response);
-            }
-
-            ErrorDetailDto reqError = solicitudPaseoValidator.validarCancelarSolicitudCliente(reqDto);
-            if (reqError != null) {
-                Date endDatetime = Calendar.getInstance().getTime();
-                response.setStatusCode(reqError.getStatusCode());
-                response.setCode(reqError.getCode());
-                response.setMessage(reqError.getMessage());
                 response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
                 return ResponseEntity.status(response.getStatusCode()).body(response);
             }

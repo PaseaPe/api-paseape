@@ -6,7 +6,8 @@ import com.paseape.apipaseape.infrastructure.constant.MessageCodes;
 import com.paseape.apipaseape.infrastructure.constant.StatusCodes;
 import com.paseape.apipaseape.infrastructure.dto.request.CancelarSolicitudReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.RechazarSolicitudReqDto;
-import com.paseape.apipaseape.infrastructure.dto.response.ErrorDetailDto;
+import com.paseape.apipaseape.infrastructure.dto.request.RegistrarUbicacionesBatchReqDto;
+import com.paseape.apipaseape.infrastructure.dto.response.BatchIngestaResDto;
 import com.paseape.apipaseape.infrastructure.dto.response.HeaderDto;
 import com.paseape.apipaseape.infrastructure.dto.response.PageResponseDto;
 import com.paseape.apipaseape.infrastructure.dto.response.ResponseDto;
@@ -20,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -53,7 +55,7 @@ public class SolicitudPaseoPaseadorController extends BaseController {
         var response = new ResponseDto<PageResponseDto<SolicitudPaseoResDto>>();
         Date startDatetime = Calendar.getInstance().getTime();
         try {
-            ErrorDetailDto validationError = solicitudPaseoValidator.validarConsultaBandejaPaseador(tab, page, size);
+            ResponseDto<?> validationError = solicitudPaseoValidator.validateConsultaBandejaPaseador(tab, page, size);
             if (validationError != null) {
                 Date endDatetime = Calendar.getInstance().getTime();
                 response.setStatusCode(validationError.getStatusCode());
@@ -146,7 +148,7 @@ public class SolicitudPaseoPaseadorController extends BaseController {
         var response = new ResponseDto<SolicitudPaseoResDto>();
         Date startDatetime = Calendar.getInstance().getTime();
         try {
-            ErrorDetailDto validationError = solicitudPaseoValidator.validarUuid(uuid, "uuid");
+            ResponseDto<?> validationError = solicitudPaseoValidator.validateTomarSolicitudInmediata(uuid);
             if (validationError != null) {
                 Date endDatetime = Calendar.getInstance().getTime();
                 response.setStatusCode(validationError.getStatusCode());
@@ -198,7 +200,7 @@ public class SolicitudPaseoPaseadorController extends BaseController {
         var response = new ResponseDto<Void>();
         Date startDatetime = Calendar.getInstance().getTime();
         try {
-            ErrorDetailDto validationError = solicitudPaseoValidator.validarUuid(uuid, "uuid");
+            ResponseDto<?> validationError = solicitudPaseoValidator.validateDescartarSolicitudInmediata(uuid);
             if (validationError != null) {
                 Date endDatetime = Calendar.getInstance().getTime();
                 response.setStatusCode(validationError.getStatusCode());
@@ -250,7 +252,7 @@ public class SolicitudPaseoPaseadorController extends BaseController {
         var response = new ResponseDto<SolicitudPaseoResDto>();
         Date startDatetime = Calendar.getInstance().getTime();
         try {
-            ErrorDetailDto validationError = solicitudPaseoValidator.validarUuid(uuid, "uuid");
+            ResponseDto<?> validationError = solicitudPaseoValidator.validateAceptarSolicitudProgramada(uuid);
             if (validationError != null) {
                 Date endDatetime = Calendar.getInstance().getTime();
                 response.setStatusCode(validationError.getStatusCode());
@@ -303,22 +305,12 @@ public class SolicitudPaseoPaseadorController extends BaseController {
         var response = new ResponseDto<SolicitudPaseoResDto>();
         Date startDatetime = Calendar.getInstance().getTime();
         try {
-            ErrorDetailDto validationError = solicitudPaseoValidator.validarUuid(uuid, "uuid");
+            ResponseDto<?> validationError = solicitudPaseoValidator.validateRechazarSolicitud(uuid, reqDto);
             if (validationError != null) {
                 Date endDatetime = Calendar.getInstance().getTime();
                 response.setStatusCode(validationError.getStatusCode());
                 response.setCode(validationError.getCode());
                 response.setMessage(validationError.getMessage());
-                response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
-                return ResponseEntity.status(response.getStatusCode()).body(response);
-            }
-
-            ErrorDetailDto reqError = solicitudPaseoValidator.validarRechazarSolicitud(reqDto);
-            if (reqError != null) {
-                Date endDatetime = Calendar.getInstance().getTime();
-                response.setStatusCode(reqError.getStatusCode());
-                response.setCode(reqError.getCode());
-                response.setMessage(reqError.getMessage());
                 response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
                 return ResponseEntity.status(response.getStatusCode()).body(response);
             }
@@ -366,22 +358,12 @@ public class SolicitudPaseoPaseadorController extends BaseController {
         var response = new ResponseDto<SolicitudPaseoResDto>();
         Date startDatetime = Calendar.getInstance().getTime();
         try {
-            ErrorDetailDto validationError = solicitudPaseoValidator.validarUuid(uuid, "uuid");
+            ResponseDto<?> validationError = solicitudPaseoValidator.validateCancelarPaseoAceptado(uuid, reqDto);
             if (validationError != null) {
                 Date endDatetime = Calendar.getInstance().getTime();
                 response.setStatusCode(validationError.getStatusCode());
                 response.setCode(validationError.getCode());
                 response.setMessage(validationError.getMessage());
-                response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
-                return ResponseEntity.status(response.getStatusCode()).body(response);
-            }
-
-            ErrorDetailDto reqError = solicitudPaseoValidator.validarCancelarSolicitud(reqDto);
-            if (reqError != null) {
-                Date endDatetime = Calendar.getInstance().getTime();
-                response.setStatusCode(reqError.getStatusCode());
-                response.setCode(reqError.getCode());
-                response.setMessage(reqError.getMessage());
                 response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
                 return ResponseEntity.status(response.getStatusCode()).body(response);
             }
@@ -428,7 +410,7 @@ public class SolicitudPaseoPaseadorController extends BaseController {
         var response = new ResponseDto<SolicitudPaseoResDto>();
         Date startDatetime = Calendar.getInstance().getTime();
         try {
-            ErrorDetailDto validationError = solicitudPaseoValidator.validarUuid(uuid, "uuid");
+            ResponseDto<?> validationError = solicitudPaseoValidator.validateIniciarPaseo(uuid);
             if (validationError != null) {
                 Date endDatetime = Calendar.getInstance().getTime();
                 response.setStatusCode(validationError.getStatusCode());
@@ -466,6 +448,59 @@ public class SolicitudPaseoPaseadorController extends BaseController {
             response.setStatusCode(StatusCodes.Code500);
             response.setCode(MessageCodes.ResponseCodeE99);
             response.setMessage("Error interno al iniciar el paseo");
+            response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
+            return ResponseEntity.status(StatusCodes.Code500).body(response);
+        }
+    }
+
+    @PostMapping("/{uuid}/ubicaciones")
+    public ResponseEntity<ResponseDto<BatchIngestaResDto>> registrarUbicaciones(
+            Principal principal,
+            @RequestHeader(value = "Authorization", required = false) String authHeader,
+            @PathVariable String uuid,
+            @RequestBody RegistrarUbicacionesBatchReqDto reqDto
+    ) {
+        var response = new ResponseDto<BatchIngestaResDto>();
+        Date startDatetime = Calendar.getInstance().getTime();
+        try {
+            String userEmail = resolverUserEmail(principal, authHeader);
+            ResponseDto<?> validationError = solicitudPaseoValidator.validateRegistrarUbicaciones(userEmail, uuid, reqDto);
+            if (validationError != null) {
+                Date endDatetime = Calendar.getInstance().getTime();
+                response.setStatusCode(validationError.getStatusCode());
+                response.setCode(validationError.getCode());
+                response.setMessage(validationError.getMessage());
+                response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
+                return ResponseEntity.status(response.getStatusCode()).body(response);
+            }
+
+            BatchIngestaResDto data = solicitudPaseoService.registrarUbicacionesTelemetria(userEmail, uuid, reqDto);
+
+            Date endDatetime = Calendar.getInstance().getTime();
+            HeaderDto headerDto = requestService.getResponseHeader(startDatetime, endDatetime);
+
+            response.setStatusCode(StatusCodes.Code200);
+            response.setCode(MessageCodes.ResponseCodeS00);
+            response.setMessage(Constant.MSJ_PUNTOS_TELEMETRIA_PROCESADOS);
+            response.setHeader(headerDto);
+            response.setResponse(data);
+            return ResponseEntity.status(response.getStatusCode()).body(response);
+        } catch (BadRequestException ex) {
+            String method = new Object() {}.getClass().getEnclosingMethod().getName();
+            logControllerError(logger, ex, this, method, "registrarUbicaciones: uuid=" + uuid);
+            Date endDatetime = Calendar.getInstance().getTime();
+            response.setStatusCode(ex.statusCode != null ? ex.statusCode : StatusCodes.Code400);
+            response.setCode(ex.code != null ? ex.code : MessageCodes.ResponseCodeBR01);
+            response.setMessage(ex.getMessage());
+            response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
+            return ResponseEntity.status(response.getStatusCode()).body(response);
+        } catch (Exception ex) {
+            String method = new Object() {}.getClass().getEnclosingMethod().getName();
+            logControllerError(logger, ex, this, method, "registrarUbicaciones: uuid=" + uuid);
+            Date endDatetime = Calendar.getInstance().getTime();
+            response.setStatusCode(StatusCodes.Code500);
+            response.setCode(MessageCodes.ResponseCodeE99);
+            response.setMessage("Error interno al registrar telemetría de ubicaciones");
             response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
             return ResponseEntity.status(StatusCodes.Code500).body(response);
         }

@@ -10,6 +10,14 @@ import com.paseape.apipaseape.application.repository.IPaseadorRepository;
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoDescarteRepository;
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoMascotaRepository;
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoRepository;
+import com.paseape.apipaseape.application.repository.ISolicitudPaseoUbicacionEnVivoRepository;
+import com.paseape.apipaseape.domain.entity.SolicitudPaseoUbicacionEnVivo;
+import com.paseape.apipaseape.infrastructure.dto.request.RegistrarUbicacionesBatchReqDto;
+import com.paseape.apipaseape.infrastructure.dto.request.UbicacionPuntoReqDto;
+import com.paseape.apipaseape.infrastructure.dto.response.BatchIngestaResDto;
+import com.paseape.apipaseape.infrastructure.util.GeoDistanceCalculator;
+import com.paseape.apipaseape.infrastructure.util.PolylineDeltaEncoder;
+import java.time.ZoneOffset;
 import com.paseape.apipaseape.application.repository.ITipoDuracionPaseoRepository;
 import com.paseape.apipaseape.application.repository.IUsuarioRepository;
 import com.paseape.apipaseape.domain.entity.BloqueHorario;
@@ -79,6 +87,7 @@ public class SolicitudPaseoService {
     private final INotificacionRepository notificacionRepository;
     private final ISolicitudPaseoDescarteRepository solicitudPaseoDescarteRepository;
     private final ISolicitudPaseoDtoMapper solicitudPaseoDtoMapper;
+    private final ISolicitudPaseoUbicacionEnVivoRepository solicitudPaseoUbicacionEnVivoRepository;
 
     @Transactional(rollbackFor = Exception.class)
     public SolicitudPaseoResDto crearSolicitudInmediata(String userEmail, CrearSolicitudInmediataReqDto reqDto) throws BadRequestException {
@@ -1135,5 +1144,99 @@ public class SolicitudPaseoService {
             paseadorNombre = (paseador.getUsuario().getNombres() + " " + (paseador.getUsuario().getApellidos() != null ? paseador.getUsuario().getApellidos() : "")).trim();
         }
         return !paseadorNombre.isEmpty() ? paseadorNombre : "Un paseador";
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public BatchIngestaResDto registrarUbicacionesTelemetria(String userEmail, String solicitudUuid, RegistrarUbicacionesBatchReqDto reqDto) {
+        SolicitudPaseo solicitud = solicitudPaseoRepository.findByUuid(solicitudUuid.trim());
+        List<UbicacionPuntoReqDto> puntos = reqDto.getUbicaciones();
+        SolicitudPaseoUbicacionEnVivo ubicacionEnVivo = solicitudPaseoUbicacionEnVivoRepository.findBySolicitudPaseoId(solicitud.getId());
+        LocalDateTime ahoraUtc = LocalDateTime.now(ZoneOffset.UTC);
+
+        if (ubicacionEnVivo == null) {
+            UbicacionPuntoReqDto p0 = puntos.get(0);
+            String initialEncoded = PolylineDeltaEncoder.codificarPuntoInicial(p0.getLatitud(), p0.getLongitud());
+            StringBuilder polylineBuilder = new StringBuilder(initialEncoded);
+
+            BigDecimal refLat = p0.getLatitud();
+            BigDecimal refLng = p0.getLongitud();
+            double distanciaAcumulada = 0.0;
+            int totalPuntos = 1;
+
+            for (int i = 1; i < puntos.size(); i++) {
+                UbicacionPuntoReqDto pi = puntos.get(i);
+                double dist = GeoDistanceCalculator.calcularDistanciaMetros(refLat, refLng, pi.getLatitud(), pi.getLongitud());
+                if (dist >= 3.0) {
+                    polylineBuilder.append(PolylineDeltaEncoder.concatenarPuntoDelta(refLat, refLng, pi.getLatitud(), pi.getLongitud()));
+                    distanciaAcumulada += dist;
+                    totalPuntos++;
+                    refLat = pi.getLatitud();
+                    refLng = pi.getLongitud();
+                }
+            }
+
+            UbicacionPuntoReqDto pUltimo = puntos.get(puntos.size() - 1);
+
+            ubicacionEnVivo = SolicitudPaseoUbicacionEnVivo.builder()
+                    .uuid(UUID.randomUUID().toString())
+                    .solicitudPaseo(solicitud)
+                    .latitudActual(pUltimo.getLatitud())
+                    .longitudActual(pUltimo.getLongitud())
+                    .precisionM(pUltimo.getPrecisionM())
+                    .velocidadMs(pUltimo.getVelocidadMs())
+                    .rumboGrados(pUltimo.getRumboGrados())
+                    .fechaHoraGps(pUltimo.getFechaHoraGps())
+                    .coordenadasCodificadas(polylineBuilder.toString())
+                    .distanciaMetrosAcumulada(BigDecimal.valueOf(distanciaAcumulada).setScale(2, RoundingMode.HALF_UP))
+                    .totalPuntos(totalPuntos)
+                    .estado(Constant.ESTADO_LOGICO_ACTIVO)
+                    .creadoEl(ahoraUtc)
+                    .creadoPor(userEmail.trim().toLowerCase())
+                    .actualizadoEl(ahoraUtc)
+                    .actualizadoPor(userEmail.trim().toLowerCase())
+                    .build();
+        } else {
+            StringBuilder polylineBuilder = new StringBuilder(
+                    ubicacionEnVivo.getCoordenadasCodificadas() != null ? ubicacionEnVivo.getCoordenadasCodificadas() : ""
+            );
+            BigDecimal refLat = ubicacionEnVivo.getLatitudActual();
+            BigDecimal refLng = ubicacionEnVivo.getLongitudActual();
+            double distanciaAcumulada = ubicacionEnVivo.getDistanciaMetrosAcumulada() != null
+                    ? ubicacionEnVivo.getDistanciaMetrosAcumulada().doubleValue()
+                    : 0.0;
+            int totalPuntos = ubicacionEnVivo.getTotalPuntos() != null ? ubicacionEnVivo.getTotalPuntos() : 0;
+
+            for (UbicacionPuntoReqDto pi : puntos) {
+                double dist = GeoDistanceCalculator.calcularDistanciaMetros(refLat, refLng, pi.getLatitud(), pi.getLongitud());
+                if (dist >= 3.0) {
+                    polylineBuilder.append(PolylineDeltaEncoder.concatenarPuntoDelta(refLat, refLng, pi.getLatitud(), pi.getLongitud()));
+                    distanciaAcumulada += dist;
+                    totalPuntos++;
+                    refLat = pi.getLatitud();
+                    refLng = pi.getLongitud();
+                }
+            }
+
+            UbicacionPuntoReqDto pUltimo = puntos.get(puntos.size() - 1);
+
+            ubicacionEnVivo.setLatitudActual(pUltimo.getLatitud());
+            ubicacionEnVivo.setLongitudActual(pUltimo.getLongitud());
+            ubicacionEnVivo.setPrecisionM(pUltimo.getPrecisionM());
+            ubicacionEnVivo.setVelocidadMs(pUltimo.getVelocidadMs());
+            ubicacionEnVivo.setRumboGrados(pUltimo.getRumboGrados());
+            ubicacionEnVivo.setFechaHoraGps(pUltimo.getFechaHoraGps());
+            ubicacionEnVivo.setCoordenadasCodificadas(polylineBuilder.toString());
+            ubicacionEnVivo.setDistanciaMetrosAcumulada(BigDecimal.valueOf(distanciaAcumulada).setScale(2, RoundingMode.HALF_UP));
+            ubicacionEnVivo.setTotalPuntos(totalPuntos);
+            ubicacionEnVivo.setActualizadoEl(ahoraUtc);
+            ubicacionEnVivo.setActualizadoPor(userEmail.trim().toLowerCase());
+        }
+
+        solicitudPaseoUbicacionEnVivoRepository.save(ubicacionEnVivo);
+
+        return BatchIngestaResDto.builder()
+                .puntosProcesados(puntos.size())
+                .paseoActivo(true)
+                .build();
     }
 }
