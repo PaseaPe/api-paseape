@@ -320,5 +320,6 @@ public class Constant {
     public static final String MSJ_ESPERA_PRIMERA_SENAL_GPS = "A la espera de la primera señal GPS del paseador";
     public static final String MSJ_RECORRIDO_CONSOLIDADO_EXITO = "El paseo ha finalizado y el recorrido ha sido consolidado";
     public static final String MSJ_RECORRIDO_OBTENIDO_EXITO = "Recorrido histórico del paseo obtenido exitosamente";
+    public static final String MSJ_SOLICITUD_DETALLE_OBTENIDO = "Detalle de la solicitud de paseo obtenido exitosamente";
     public static final String MSJ_ERROR_PASEO_NO_ACTIVO_GPS = "No se puede registrar telemetría porque el paseo no se encuentra en curso.";
 }

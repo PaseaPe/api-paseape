@@ -107,9 +107,12 @@ public class PaseadorService {
         if (usuario == null) {
             throw new BadRequestException("No se encontró el usuario del paseador.");
         }
+        FolderDigitalDocument folder = usuario.getFolderDigitalDocument() != null ? usuario.getFolderDigitalDocument() : null;
         UsuarioResDto usuarioResDto = usuarioDtoMapper.toResDto(usuario, null, paseador, null, paseadorDtoMapper);
         usuarioResDto.setFotoPerfilUrl(digitalDocumentService.urlFotoPerfil(usuario));
-        usuarioResDto.setDigitalDocuments(digitalDocumentDtoMapper.toResDtoList(digitalDocumentService.documentList(usuario.getFolderDigitalDocument().getId())));
+        if (folder != null) {
+            usuarioResDto.setDigitalDocuments(digitalDocumentDtoMapper.toResDtoList(digitalDocumentService.documentList(usuario.getFolderDigitalDocument().getId())));
+        }
         return usuarioResDto;
     }
 

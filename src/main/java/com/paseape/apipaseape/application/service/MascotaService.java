@@ -187,8 +187,14 @@ public class MascotaService {
             throw new BadRequestException("Cliente no encontrado");
         }
 
-        List<Mascota> mascotas = mascotaRepository.findAllByClienteIdAndEstado(cliente.getId(),1);
-        return mascotaDtoMapper.toResDtoList(mascotas);
+        List<Mascota> mascotas = mascotaRepository.findAllByClienteIdAndEstado(cliente.getId(), 1);
+        List<MascotaResDto> respuesta = new ArrayList<>();
+        if (mascotas != null) {
+            for (Mascota mascota : mascotas) {
+                respuesta.add(poblarRespuestaMascota(mascota));
+            }
+        }
+        return respuesta;
     }
 
     @Transactional(readOnly = true)
