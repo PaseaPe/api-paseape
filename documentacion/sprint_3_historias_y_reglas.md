@@ -329,14 +329,18 @@ CREATE INDEX `idx_spr_solicitud_estado` ON `solicitud_paseo_recorrido` (`solicit
 
 ### E. Finalización del Paseo y Consolidación a Histórico
 - **Rol:** Paseador
-- **Estado:** **PENDIENTE DE IMPLEMENTACIÓN** (Aún no desarrollado en backend)
+- **Estado:** **IMPLEMENTADO**
 - **Descripción:** Cierre formal del servicio de paseo por parte del paseador, consolidación inmutable de la ruta a la tabla de histórico y actualización del estado del paseo a `FINALIZADA` (6).
-- **Endpoint Planificado:** `PATCH /paseador/solicitudes/{uuid}/finalizar` (Pendiente)
-- **Alcance Pendiente de Desarrollo:**
-  - Validación de titularidad del paseador autenticado y estado estricto `EN_CURSO` (5) en `SolicitudPaseoValidator`.
-  - Lógica de cálculo en `SolicitudPaseoService` para métricas finales (duración real, velocidad promedio), inserción directa en `solicitud_paseo_recorrido` y liberación del buffer de `solicitud_paseo_ubicacion_en_vivo`.
+- **Endpoint:** `PATCH /paseador/solicitudes/{uuid}/finalizar`
+- **Alcance Desarrollado:**
+  - Validación sintáctica de UUID en `SolicitudPaseoValidator.validateFinalizarPaseo` (Estándar Mortgage).
+  - Lógica atómica en `SolicitudPaseoService.finalizarPaseo` para:
+    * Verificación de titularidad del paseador autenticado y estado estricto `EN_CURSO` (5).
+    * Cálculo de duración real en segundos (`ChronoUnit.SECONDS.between(inicioReal, finReal)`) y velocidad promedio en km/h ($(\text{distancia} / \text{duracion}) \times 3.6$).
+    * Inserción directa inmutable en `solicitud_paseo_recorrido` y eliminación (`DELETE`) del registro transitorio en `solicitud_paseo_ubicacion_en_vivo`.
+    * Creación y persistencia de la notificación interna para el cliente en `notificaciones` (`tipo_notificacion_id = 5` [`ID_TIPO_NOTIFICACION_PASEO_FINALIZADO`]).
   - Exposición de la ruta HTTP en `SolicitudPaseoPaseadorController`.
-  - Creación de pruebas unitarias en JUnit 5 + Mockito.
+  - Pruebas unitarias completas en JUnit 5 + Mockito cubriendo flujos exitosos y excepciones de negocio (`BadRequestException`).
 
 ---
 
@@ -350,7 +354,7 @@ Todas las rutas operan bajo el context path `/api-paseape` y retornan `ResponseD
 | `POST` | `/paseador/solicitudes/{uuid}/ubicaciones` | `PASEADOR` | Ingesta en lote de coordenadas GPS con acumulación directa en caliente (HU26). | **IMPLEMENTADO** |
 | `GET` | `/cliente/solicitudes/{uuid}/ubicacion-actual` | `CLIENTE` | Retorna última posición GPS conocida del paseador para monitoreo en vivo (HU24). | **IMPLEMENTADO** |
 | `GET` | `/solicitudes/{uuid}/recorrido` | `CLIENTE`, `PASEADOR`, `ADMIN` | Consulta el recorrido consolidado inmutable post-paseo (Strava-like) (HU24). | **IMPLEMENTADO** |
-| `PATCH` | `/paseador/solicitudes/{uuid}/finalizar` | `PASEADOR` | Concluye el paseo, consolida el recorrido a histórico y libera el buffer en vivo. | **PENDIENTE** |
+| `PATCH` | `/paseador/solicitudes/{uuid}/finalizar` | `PASEADOR` | Concluye el paseo, consolida el recorrido a histórico y libera el buffer en vivo. | **IMPLEMENTADO** |
 
 ---
 
@@ -417,10 +421,11 @@ Siguiendo el estándar Mortgage (`docs/agents/validators.md`), el validador lanz
 - [x] **HU26 (Telemetría GPS por Lotes):** `POST /paseador/solicitudes/{uuid}/ubicaciones` con acumulador en caliente $O(1)$ y filtro de ruido GPS $\Delta d \ge 3.0\text{ m}$.
 - [x] **HU24 (Monitoreo en Vivo Short Polling):** `GET /cliente/solicitudes/{uuid}/ubicacion-actual` con diagnóstico de señal degradada (> 45 s) y espera de primera señal.
 - [x] **HU24 (Recorrido Consolidado Strava-like):** `GET /solicitudes/{uuid}/recorrido` en controlador independiente `SolicitudPaseoRecorridoController` con acceso multi-rol (`CLIENTE`, `PASEADOR`, `ADMIN`).
+- [x] **Finalización del Paseo y Consolidación a Histórico:** `PATCH /paseador/solicitudes/{uuid}/finalizar` (Validador `validateFinalizarPaseo`, lógica en servicio `finalizarPaseo`, endpoint en `SolicitudPaseoPaseadorController` y notificación interna al cliente).
 - [x] **Pruebas Unitarias:** Cobertura de validadores, controladores y servicios de las historias implementadas.
 
 ### 11.2. Funcionalidades Pendientes de Desarrollo
-- [ ] **Finalización del Paseo y Consolidación a Histórico:** `PATCH /paseador/solicitudes/{uuid}/finalizar` (Pendiente de definir e implementar: validador `validateFinalizarPaseo`, lógica en servicio `finalizarPaseo`, endpoint en controlador y pruebas unitarias).
+- *Todas las funcionalidades del Sprint 3 han sido completadas e integradas.*
 
 ---
 

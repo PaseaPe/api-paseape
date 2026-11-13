@@ -18,6 +18,7 @@ import com.paseape.apipaseape.infrastructure.dto.response.SolicitudPaseoRecorrid
 import com.paseape.apipaseape.infrastructure.mapper.dto.ISolicitudPaseoUbicacionEnVivoDtoMapper;
 import com.paseape.apipaseape.infrastructure.mapper.dto.ISolicitudPaseoRecorridoDtoMapper;
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import com.paseape.apipaseape.domain.entity.SolicitudPaseoUbicacionEnVivo;
 import com.paseape.apipaseape.infrastructure.dto.request.RegistrarUbicacionesBatchReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.UbicacionPuntoReqDto;
@@ -43,6 +44,7 @@ import com.paseape.apipaseape.domain.entity.TipoDuracionPaseo;
 import com.paseape.apipaseape.domain.entity.TipoMetodoPago;
 import com.paseape.apipaseape.domain.entity.TipoModalidadPaseo;
 import com.paseape.apipaseape.domain.entity.TipoNotificacion;
+import com.paseape.apipaseape.domain.entity.TipoOrigenTraza;
 import com.paseape.apipaseape.domain.entity.Usuario;
 import com.paseape.apipaseape.infrastructure.constant.Constant;
 import com.paseape.apipaseape.infrastructure.constant.MessageCodes;
@@ -949,6 +951,104 @@ public class SolicitudPaseoService {
 
         List<SolicitudPaseoMascota> mascotas = solicitudPaseoMascotaRepository.findAllBySolicitudPaseoIdWithDetails(guardada.getId());
         return solicitudPaseoDtoMapper.toResDto(guardada, mascotas);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public SolicitudPaseoResDto finalizarPaseo(String userEmail, String solicitudUuid) throws BadRequestException {
+        Usuario usuario = usuarioRepository.findByCorreo(userEmail.trim().toLowerCase());
+        Paseador paseador = paseadorRepository.findByUsuarioId(usuario.getId());
+        SolicitudPaseo solicitud = solicitudPaseoRepository.findByUuidWithDetails(solicitudUuid.trim());
+        if (solicitud == null) {
+            solicitud = solicitudPaseoRepository.findByUuid(solicitudUuid.trim());
+        }
+
+        if (solicitud.getSolicitudPaseoEstado() != null
+                && Integer.valueOf(Constant.ID_ESTADO_SOLICITUD_FINALIZADA).equals(solicitud.getSolicitudPaseoEstado().getId())) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR03, Constant.MSJ_ERROR_PASEO_YA_FINALIZADO);
+        }
+
+        if (solicitud.getSolicitudPaseoEstado() == null
+                || !Integer.valueOf(Constant.ID_ESTADO_SOLICITUD_EN_CURSO).equals(solicitud.getSolicitudPaseoEstado().getId())) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR03, Constant.MSJ_ERROR_SOLICITUD_NO_FINALIZABLE);
+        }
+
+        solicitud.setSolicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_FINALIZADA));
+        solicitud.setFechaHoraFinReal(LocalDateTime.now());
+        SolicitudPaseo guardada = solicitudPaseoRepository.save(solicitud);
+
+        // Consolidación de recorrido Strava-like
+        SolicitudPaseoUbicacionEnVivo enVivo = solicitudPaseoUbicacionEnVivoRepository.findBySolicitudPaseoId(guardada.getId());
+
+        long duracionCalc = 0;
+        if (guardada.getFechaHoraInicioReal() != null && guardada.getFechaHoraFinReal() != null) {
+            duracionCalc = ChronoUnit.SECONDS.between(guardada.getFechaHoraInicioReal(), guardada.getFechaHoraFinReal());
+            if (duracionCalc < 0) {
+                duracionCalc = 0;
+            }
+        }
+        int duracionSegundos = (int) duracionCalc;
+
+        BigDecimal distanciaMetros = BigDecimal.ZERO;
+        int totalPuntos = 0;
+        String coordenadasCodificadas = "";
+        BigDecimal velocidadPromedioKmh = BigDecimal.ZERO;
+
+        if (enVivo != null) {
+            if (enVivo.getDistanciaMetrosAcumulada() != null) {
+                distanciaMetros = enVivo.getDistanciaMetrosAcumulada();
+            }
+            if (enVivo.getTotalPuntos() != null) {
+                totalPuntos = enVivo.getTotalPuntos();
+            }
+            if (enVivo.getCoordenadasCodificadas() != null) {
+                coordenadasCodificadas = enVivo.getCoordenadasCodificadas();
+            }
+        }
+
+        if (duracionSegundos > 0 && distanciaMetros.compareTo(BigDecimal.ZERO) > 0) {
+            velocidadPromedioKmh = distanciaMetros.divide(BigDecimal.valueOf(duracionSegundos), 6, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(3.6))
+                    .setScale(2, RoundingMode.HALF_UP);
+        }
+
+        SolicitudPaseoRecorrido recorrido = SolicitudPaseoRecorrido.builder()
+                .uuid(UUID.randomUUID().toString())
+                .solicitudPaseo(guardada)
+                .tipoOrigenTraza(new TipoOrigenTraza(Constant.ID_ORIGEN_TRAZA_GPS_TIEMPO_REAL))
+                .distanciaMetros(distanciaMetros)
+                .duracionSegundos(duracionSegundos)
+                .velocidadPromedioKmh(velocidadPromedioKmh)
+                .coordenadasCodificadas(coordenadasCodificadas)
+                .coordenadasTotalPuntos(totalPuntos)
+                .estado(Constant.ESTADO_LOGICO_ACTIVO)
+                .build();
+        solicitudPaseoRecorridoRepository.save(recorrido);
+
+        if (enVivo != null) {
+            solicitudPaseoUbicacionEnVivoRepository.deleteBySolicitudPaseoId(guardada.getId());
+        }
+
+        // Notificación interna para el cliente
+        Usuario destinatario = guardada.getCliente() != null ? guardada.getCliente().getUsuario() : null;
+        if (destinatario != null) {
+            String paseadorNombre = obtenerNombreCompletoPaseador(usuario, paseador);
+            Notificacion notificacion = Notificacion.builder()
+                    .uuid(UUID.randomUUID().toString())
+                    .remitenteUsuario(usuario)
+                    .destinatarioUsuario(destinatario)
+                    .tipoNotificacion(new TipoNotificacion(Constant.ID_TIPO_NOTIFICACION_PASEO_FINALIZADO))
+                    .titulo(Constant.TITULO_NOTIF_PASEO_FINALIZADO)
+                    .mensaje("El paseador " + paseadorNombre + " ha finalizado el paseo " + guardada.getCodigoReserva() + " de tus mascotas. Ya puedes revisar el recorrido y calificar el servicio.")
+                    .referenciaId(guardada.getId())
+                    .referenciaTipo(Constant.REFERENCIA_TIPO_SOLICITUD_PASEO)
+                    .leido(false)
+                    .estado(Constant.ESTADO_LOGICO_ACTIVO)
+                    .build();
+            notificacionRepository.save(notificacion);
+        }
+
+        List<SolicitudPaseoMascota> mascotasFinal = solicitudPaseoMascotaRepository.findAllBySolicitudPaseoIdWithDetails(guardada.getId());
+        return solicitudPaseoDtoMapper.toResDto(guardada, mascotasFinal);
     }
 
     @Transactional(readOnly = true)

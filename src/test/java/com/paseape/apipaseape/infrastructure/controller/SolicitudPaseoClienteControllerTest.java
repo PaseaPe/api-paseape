@@ -100,7 +100,7 @@ class SolicitudPaseoClienteControllerTest {
         valErr.setCode(MessageCodes.ResponseCodeBR01);
         valErr.setMessage("La lista de mascotas es obligatoria");
 
-        when(solicitudPaseoValidator.validateCrearInmediata(req)).thenReturn(valErr);
+        doReturn(valErr).when(solicitudPaseoValidator).validateCrearInmediata(req);
 
         ResponseEntity<ResponseDto<SolicitudPaseoResDto>> responseEntity = controller.crearSolicitudInmediata(
                 mockPrincipal,
@@ -186,7 +186,7 @@ class SolicitudPaseoClienteControllerTest {
         valErr.setCode(MessageCodes.ResponseCodeBR01);
         valErr.setMessage("El campo 'paseador_uuid' es obligatorio");
 
-        when(solicitudPaseoValidator.validateCrearProgramada(req)).thenReturn(valErr);
+        doReturn(valErr).when(solicitudPaseoValidator).validateCrearProgramada(req);
 
         ResponseEntity<ResponseDto<SolicitudPaseoResDto>> responseEntity = controller.crearSolicitudProgramada(
                 mockPrincipal,

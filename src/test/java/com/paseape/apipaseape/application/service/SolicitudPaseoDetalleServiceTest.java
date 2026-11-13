@@ -88,7 +88,10 @@ class SolicitudPaseoDetalleServiceTest {
                 .id(100L)
                 .uuid(solicitudUuid)
                 .codigoReserva("PAS-PROG-202611-ABCD")
-                .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_PENDIENTE, Constant.ESTADO_SOLICITUD_PENDIENTE, null, 1, null, null, null, null))
+                .solicitudPaseoEstado(SolicitudPaseoEstado.builder()
+                        .id(Constant.ID_ESTADO_SOLICITUD_PENDIENTE)
+                        .descripcion(Constant.ESTADO_SOLICITUD_PENDIENTE)
+                        .build())
                 .cliente(cliente)
                 .paseador(paseador)
                 .build();

@@ -96,7 +96,7 @@ class SolicitudPaseoRecorridoControllerTest {
         valErr.setCode(MessageCodes.ResponseCodeBR01);
         valErr.setMessage("El identificador de la solicitud no tiene un formato UUID válido.");
 
-        when(solicitudPaseoValidator.validateObtenerRecorridoConsolidado("usuario@paseape.com", uuid)).thenReturn(valErr);
+        doReturn(valErr).when(solicitudPaseoValidator).validateObtenerRecorridoConsolidado("usuario@paseape.com", uuid);
 
         ResponseEntity<ResponseDto<SolicitudPaseoRecorridoResDto>> responseEntity = controller.obtenerRecorridoConsolidado(
                 mockPrincipal,

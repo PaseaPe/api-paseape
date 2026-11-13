@@ -338,4 +338,64 @@ class SolicitudPaseoValidatorTest {
         );
         assertNull(validator.validateObtenerRecorridoConsolidado(email, uuid));
     }
+
+    @Test
+    @DisplayName("validateFinalizarPaseo - Valida sesión, uuid, existencia de paseador y titularidad de la solicitud")
+    void testValidateFinalizarPaseo() {
+        String validUuid = UUID.randomUUID().toString();
+        String email = "paseador@paseape.com";
+
+        // 1. Email o UUID inválidos
+        assertNotNull(validator.validateFinalizarPaseo(null, validUuid));
+        assertNotNull(validator.validateFinalizarPaseo("", validUuid));
+        assertNotNull(validator.validateFinalizarPaseo(email, null));
+        assertNotNull(validator.validateFinalizarPaseo(email, "uuid-invalido"));
+
+        // 2. Usuario no encontrado
+        when(usuarioRepository.findByCorreo(email)).thenReturn(null);
+        ResponseDto<?> errUser = validator.validateFinalizarPaseo(email, validUuid);
+        assertNotNull(errUser);
+        assertEquals(MessageCodes.ResponseCodeBR98, errUser.getCode());
+
+        // 3. Paseador no registrado
+        when(usuarioRepository.findByCorreo(email)).thenReturn(Usuario.builder().id(20L).build());
+        when(paseadorRepository.findByUsuarioId(20L)).thenReturn(null);
+        ResponseDto<?> errPaseador = validator.validateFinalizarPaseo(email, validUuid);
+        assertNotNull(errPaseador);
+        assertEquals(MessageCodes.ResponseCodeBR03, errPaseador.getCode());
+
+        // 4. Paseador inactivo
+        when(paseadorRepository.findByUsuarioId(20L)).thenReturn(Paseador.builder().id(30L).estado(0).build());
+        ResponseDto<?> errInactivo = validator.validateFinalizarPaseo(email, validUuid);
+        assertNotNull(errInactivo);
+        assertEquals(MessageCodes.ResponseCodeBR04, errInactivo.getCode());
+
+        // 5. Solicitud no encontrada
+        when(paseadorRepository.findByUsuarioId(20L)).thenReturn(Paseador.builder().id(30L).estado(1).build());
+        when(solicitudPaseoRepository.findByUuidWithDetails(validUuid)).thenReturn(null);
+        when(solicitudPaseoRepository.findByUuid(validUuid)).thenReturn(null);
+        ResponseDto<?> errSolNotFound = validator.validateFinalizarPaseo(email, validUuid);
+        assertNotNull(errSolNotFound);
+        assertEquals(MessageCodes.ResponseCodeBR98, errSolNotFound.getCode());
+
+        // 6. Solicitud no pertenece al paseador
+        when(solicitudPaseoRepository.findByUuidWithDetails(validUuid)).thenReturn(
+                SolicitudPaseo.builder()
+                        .id(100L)
+                        .paseador(Paseador.builder().id(999L).build())
+                        .build()
+        );
+        ResponseDto<?> errNotOwner = validator.validateFinalizarPaseo(email, validUuid);
+        assertNotNull(errNotOwner);
+        assertEquals(MessageCodes.ResponseCodeBR03, errNotOwner.getCode());
+
+        // 7. Éxito
+        when(solicitudPaseoRepository.findByUuidWithDetails(validUuid)).thenReturn(
+                SolicitudPaseo.builder()
+                        .id(100L)
+                        .paseador(Paseador.builder().id(30L).build())
+                        .build()
+        );
+        assertNull(validator.validateFinalizarPaseo(email, validUuid));
+    }
 }

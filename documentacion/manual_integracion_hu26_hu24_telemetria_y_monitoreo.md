@@ -593,4 +593,4 @@ class DetalleRecorridoActivity : AppCompatActivity(), OnMapReadyCallback {
 | **HU26** | Telemetría GPS en Lote | `POST /paseador/solicitudes/{uuid}/ubicaciones` | `ForegroundService` + `FusedLocationProviderClient` | **IMPLEMENTADO** |
 | **HU24** | Monitoreo en Vivo | `GET /cliente/solicitudes/{uuid}/ubicacion-actual` | Short polling (6-8s) con rotación de marcador | **IMPLEMENTADO** |
 | **HU24** | Recorrido Consolidado | `GET /solicitudes/{uuid}/recorrido` | Decodificación con `android-maps-utils` (Strava-like) | **IMPLEMENTADO** |
-| **Siguiente Etapa** | Finalización del Paseo | `PATCH /paseador/solicitudes/{uuid}/finalizar` | Botón "Finalizar Paseo" + Resumen post-paseo | **PENDIENTE** |
+| **Cierre Paseo** | Finalización del Paseo | `PATCH /paseador/solicitudes/{uuid}/finalizar` | Botón "Finalizar Paseo" + Resumen post-paseo | **IMPLEMENTADO** |

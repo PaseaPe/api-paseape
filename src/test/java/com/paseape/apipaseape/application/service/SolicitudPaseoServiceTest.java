@@ -10,6 +10,8 @@ import com.paseape.apipaseape.application.repository.IPaseadorRepository;
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoDescarteRepository;
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoMascotaRepository;
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoRepository;
+import com.paseape.apipaseape.application.repository.ISolicitudPaseoRecorridoRepository;
+import com.paseape.apipaseape.application.repository.ISolicitudPaseoUbicacionEnVivoRepository;
 import com.paseape.apipaseape.application.repository.ITipoDuracionPaseoRepository;
 import com.paseape.apipaseape.application.repository.IUsuarioRepository;
 import com.paseape.apipaseape.domain.entity.BloqueHorario;
@@ -24,6 +26,8 @@ import com.paseape.apipaseape.domain.entity.PaseadorEstadoVerificacion;
 import com.paseape.apipaseape.domain.entity.SolicitudPaseo;
 import com.paseape.apipaseape.domain.entity.SolicitudPaseoEstado;
 import com.paseape.apipaseape.domain.entity.SolicitudPaseoMascota;
+import com.paseape.apipaseape.domain.entity.SolicitudPaseoRecorrido;
+import com.paseape.apipaseape.domain.entity.SolicitudPaseoUbicacionEnVivo;
 import com.paseape.apipaseape.domain.entity.TipoDuracionPaseo;
 import com.paseape.apipaseape.domain.entity.TipoMetodoPago;
 import com.paseape.apipaseape.domain.entity.TipoModalidadPaseo;
@@ -37,6 +41,8 @@ import com.paseape.apipaseape.infrastructure.dto.request.CrearSolicitudProgramad
 import com.paseape.apipaseape.infrastructure.dto.response.SolicitudPaseoResDto;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
 import com.paseape.apipaseape.infrastructure.mapper.dto.ISolicitudPaseoDtoMapper;
+import com.paseape.apipaseape.infrastructure.mapper.dto.ISolicitudPaseoRecorridoDtoMapper;
+import com.paseape.apipaseape.infrastructure.mapper.dto.ISolicitudPaseoUbicacionEnVivoDtoMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -85,6 +91,14 @@ class SolicitudPaseoServiceTest {
     private INotificacionRepository notificacionRepository;
     @Mock
     private ISolicitudPaseoDescarteRepository solicitudPaseoDescarteRepository;
+    @Mock
+    private ISolicitudPaseoUbicacionEnVivoRepository solicitudPaseoUbicacionEnVivoRepository;
+    @Mock
+    private ISolicitudPaseoRecorridoRepository solicitudPaseoRecorridoRepository;
+    @Mock
+    private ISolicitudPaseoUbicacionEnVivoDtoMapper solicitudPaseoUbicacionEnVivoDtoMapper;
+    @Mock
+    private ISolicitudPaseoRecorridoDtoMapper solicitudPaseoRecorridoDtoMapper;
 
     private ISolicitudPaseoDtoMapper solicitudPaseoDtoMapper;
     private SolicitudPaseoService service;
@@ -114,7 +128,11 @@ class SolicitudPaseoServiceTest {
                 diaSemanaRepository,
                 notificacionRepository,
                 solicitudPaseoDescarteRepository,
-                solicitudPaseoDtoMapper
+                solicitudPaseoDtoMapper,
+                solicitudPaseoUbicacionEnVivoRepository,
+                solicitudPaseoRecorridoRepository,
+                solicitudPaseoUbicacionEnVivoDtoMapper,
+                solicitudPaseoRecorridoDtoMapper
         );
 
         clienteUsuario = Usuario.builder()
@@ -992,5 +1010,146 @@ class SolicitudPaseoServiceTest {
         assertEquals(MessageCodes.ResponseCodeBR03, ex.code);
         assertEquals(Constant.MSJ_ERROR_PASEO_YA_EN_CURSO, ex.getMessage());
         verify(notificacionRepository, never()).save(any(Notificacion.class));
+    }
+
+    @Test
+    @DisplayName("finalizarPaseo - Éxito al finalizar con telemetría en vivo, consolidar recorrido y notificar")
+    void testFinalizarPaseo_ExitoConTelemetria() throws BadRequestException {
+        String uuid = UUID.randomUUID().toString();
+        LocalDateTime inicio = LocalDateTime.now().minusMinutes(30);
+
+        SolicitudPaseo solicitud = SolicitudPaseo.builder()
+                .id(100L)
+                .uuid(uuid)
+                .codigoReserva("PAS-INM-202610-0010")
+                .cliente(cliente)
+                .paseador(paseador)
+                .fechaHoraInicioReal(inicio)
+                .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_EN_CURSO))
+                .build();
+
+        SolicitudPaseoUbicacionEnVivo enVivo = SolicitudPaseoUbicacionEnVivo.builder()
+                .id(50L)
+                .solicitudPaseo(solicitud)
+                .distanciaMetrosAcumulada(BigDecimal.valueOf(1800.50))
+                .totalPuntos(120)
+                .coordenadasCodificadas("_p~iF~ps|U_ulLnnqC")
+                .build();
+
+        when(usuarioRepository.findByCorreo("paseador@paseape.com")).thenReturn(paseadorUsuario);
+        when(paseadorRepository.findByUsuarioId(20L)).thenReturn(paseador);
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(solicitud);
+        when(solicitudPaseoRepository.save(any(SolicitudPaseo.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(solicitudPaseoUbicacionEnVivoRepository.findBySolicitudPaseoId(100L)).thenReturn(enVivo);
+        when(solicitudPaseoMascotaRepository.findAllBySolicitudPaseoIdWithDetails(100L)).thenReturn(List.of());
+
+        SolicitudPaseoResDto result = service.finalizarPaseo("paseador@paseape.com", uuid);
+
+        assertNotNull(result);
+        assertEquals(Constant.ID_ESTADO_SOLICITUD_FINALIZADA, result.getEstadoId());
+
+        ArgumentCaptor<SolicitudPaseoRecorrido> recorridoCaptor = ArgumentCaptor.forClass(SolicitudPaseoRecorrido.class);
+        verify(solicitudPaseoRecorridoRepository).save(recorridoCaptor.capture());
+        SolicitudPaseoRecorrido recorridoGuardado = recorridoCaptor.getValue();
+        assertEquals(BigDecimal.valueOf(1800.50), recorridoGuardado.getDistanciaMetros());
+        assertEquals(120, recorridoGuardado.getCoordenadasTotalPuntos());
+        assertEquals("_p~iF~ps|U_ulLnnqC", recorridoGuardado.getCoordenadasCodificadas());
+        assertTrue(recorridoGuardado.getDuracionSegundos() >= 1800);
+        assertTrue(recorridoGuardado.getVelocidadPromedioKmh().compareTo(BigDecimal.ZERO) > 0);
+
+        verify(solicitudPaseoUbicacionEnVivoRepository).deleteBySolicitudPaseoId(100L);
+
+        ArgumentCaptor<Notificacion> notifCaptor = ArgumentCaptor.forClass(Notificacion.class);
+        verify(notificacionRepository).save(notifCaptor.capture());
+        Notificacion notif = notifCaptor.getValue();
+        assertEquals(Constant.ID_TIPO_NOTIFICACION_PASEO_FINALIZADO, notif.getTipoNotificacion().getId());
+        assertEquals(Constant.TITULO_NOTIF_PASEO_FINALIZADO, notif.getTitulo());
+        assertEquals(clienteUsuario.getId(), notif.getDestinatarioUsuario().getId());
+    }
+
+    @Test
+    @DisplayName("finalizarPaseo - Éxito al finalizar sin telemetría (caso borde sin puntos GPS)")
+    void testFinalizarPaseo_ExitoSinTelemetria() throws BadRequestException {
+        String uuid = UUID.randomUUID().toString();
+        LocalDateTime inicio = LocalDateTime.now().minusMinutes(10);
+
+        SolicitudPaseo solicitud = SolicitudPaseo.builder()
+                .id(101L)
+                .uuid(uuid)
+                .codigoReserva("PAS-INM-202610-0011")
+                .cliente(cliente)
+                .paseador(paseador)
+                .fechaHoraInicioReal(inicio)
+                .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_EN_CURSO))
+                .build();
+
+        when(usuarioRepository.findByCorreo("paseador@paseape.com")).thenReturn(paseadorUsuario);
+        when(paseadorRepository.findByUsuarioId(20L)).thenReturn(paseador);
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(solicitud);
+        when(solicitudPaseoRepository.save(any(SolicitudPaseo.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(solicitudPaseoUbicacionEnVivoRepository.findBySolicitudPaseoId(101L)).thenReturn(null);
+        when(solicitudPaseoMascotaRepository.findAllBySolicitudPaseoIdWithDetails(101L)).thenReturn(List.of());
+
+        SolicitudPaseoResDto result = service.finalizarPaseo("paseador@paseape.com", uuid);
+
+        assertNotNull(result);
+        assertEquals(Constant.ID_ESTADO_SOLICITUD_FINALIZADA, result.getEstadoId());
+
+        ArgumentCaptor<SolicitudPaseoRecorrido> recorridoCaptor = ArgumentCaptor.forClass(SolicitudPaseoRecorrido.class);
+        verify(solicitudPaseoRecorridoRepository).save(recorridoCaptor.capture());
+        SolicitudPaseoRecorrido recorridoGuardado = recorridoCaptor.getValue();
+        assertEquals(BigDecimal.ZERO, recorridoGuardado.getDistanciaMetros());
+        assertEquals(0, recorridoGuardado.getCoordenadasTotalPuntos());
+        assertEquals("", recorridoGuardado.getCoordenadasCodificadas());
+        assertEquals(BigDecimal.ZERO, recorridoGuardado.getVelocidadPromedioKmh());
+
+        verify(solicitudPaseoUbicacionEnVivoRepository, never()).deleteBySolicitudPaseoId(anyLong());
+        verify(notificacionRepository).save(any(Notificacion.class));
+    }
+
+    @Test
+    @DisplayName("finalizarPaseo - Falla si el paseo ya se encuentra FINALIZADA")
+    void testFinalizarPaseo_YaFinalizada() {
+        String uuid = UUID.randomUUID().toString();
+        SolicitudPaseo solicitud = SolicitudPaseo.builder()
+                .id(103L)
+                .uuid(uuid)
+                .paseador(paseador)
+                .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_FINALIZADA))
+                .build();
+
+        when(usuarioRepository.findByCorreo("paseador@paseape.com")).thenReturn(paseadorUsuario);
+        when(paseadorRepository.findByUsuarioId(20L)).thenReturn(paseador);
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(solicitud);
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () ->
+                service.finalizarPaseo("paseador@paseape.com", uuid));
+
+        assertEquals(MessageCodes.ResponseCodeBR03, ex.code);
+        assertEquals(Constant.MSJ_ERROR_PASEO_YA_FINALIZADO, ex.getMessage());
+        verify(solicitudPaseoRecorridoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("finalizarPaseo - Falla si la solicitud no está en estado EN_CURSO")
+    void testFinalizarPaseo_NoEnCurso() {
+        String uuid = UUID.randomUUID().toString();
+        SolicitudPaseo solicitud = SolicitudPaseo.builder()
+                .id(104L)
+                .uuid(uuid)
+                .paseador(paseador)
+                .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_ACEPTADA))
+                .build();
+
+        when(usuarioRepository.findByCorreo("paseador@paseape.com")).thenReturn(paseadorUsuario);
+        when(paseadorRepository.findByUsuarioId(20L)).thenReturn(paseador);
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(solicitud);
+
+        BadRequestException ex = assertThrows(BadRequestException.class, () ->
+                service.finalizarPaseo("paseador@paseape.com", uuid));
+
+        assertEquals(MessageCodes.ResponseCodeBR03, ex.code);
+        assertEquals(Constant.MSJ_ERROR_SOLICITUD_NO_FINALIZABLE, ex.getMessage());
+        verify(solicitudPaseoRecorridoRepository, never()).save(any());
     }
 }

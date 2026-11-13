@@ -364,6 +364,56 @@ public class SolicitudPaseoValidator {
         return null;
     }
 
+    public ResponseDto<?> validateFinalizarPaseo(String userEmail, String uuid) {
+        try {
+            // 1. Nulidad de parámetros y sesión
+            if (ObjectUtils.isEmpty(userEmail) || userEmail.trim().isEmpty()) {
+                throw new BadRequestException(MessageCodes.ResponseCodeE01, "Usuario no autenticado.");
+            }
+
+            this.validateUuidInternal(uuid, "de la solicitud");
+
+            // 2. Existencia previa y estado del paseador
+            if (usuarioRepository != null && paseadorRepository != null) {
+                Usuario usuario = usuarioRepository.findByCorreo(userEmail.trim().toLowerCase());
+                if (usuario == null) {
+                    throw new BadRequestException(MessageCodes.ResponseCodeBR98, "No se encontró el usuario autenticado.");
+                }
+
+                Paseador paseador = paseadorRepository.findByUsuarioId(usuario.getId());
+                if (paseador == null) {
+                    throw new BadRequestException(MessageCodes.ResponseCodeBR03, "El usuario no cuenta con un perfil de paseador registrado.");
+                }
+
+                if (paseador.getEstado() != null && paseador.getEstado() != Constant.ESTADO_LOGICO_ACTIVO) {
+                    throw new BadRequestException(MessageCodes.ResponseCodeBR04, "El paseador no se encuentra activo.");
+                }
+
+                // 3. Existencia de la solicitud y titularidad
+                if (solicitudPaseoRepository != null) {
+                    SolicitudPaseo solicitud = solicitudPaseoRepository.findByUuidWithDetails(uuid.trim());
+                    if (solicitud == null) {
+                        solicitud = solicitudPaseoRepository.findByUuid(uuid.trim());
+                    }
+                    if (solicitud == null) {
+                        throw new BadRequestException(MessageCodes.ResponseCodeBR98, "No se encontró la solicitud de paseo.");
+                    }
+
+                    if (solicitud.getPaseador() == null || !paseador.getId().equals(solicitud.getPaseador().getId())) {
+                        throw new BadRequestException(MessageCodes.ResponseCodeBR03, "La solicitud no pertenece al paseador autenticado.");
+                    }
+                }
+            }
+        } catch (BadRequestException brex) {
+            return BuildErrorForValidation(
+                    brex.statusCode != null ? brex.statusCode : StatusCodes.Code400,
+                    brex.code != null ? brex.code : MessageCodes.ResponseCodeBR01,
+                    brex.getMessage()
+            );
+        }
+        return null;
+    }
+
     public ResponseDto<?> validateRegistrarUbicaciones(String userEmail, String uuid, RegistrarUbicacionesBatchReqDto reqDto) {
         try {
             // 1. Nulidad de parámetros y sesión
