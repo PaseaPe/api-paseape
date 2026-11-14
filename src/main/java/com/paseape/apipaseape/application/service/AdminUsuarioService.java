@@ -1,20 +1,12 @@
 package com.paseape.apipaseape.application.service;
 
+import com.paseape.apipaseape.application.repository.*;
+import com.paseape.apipaseape.domain.entity.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import com.paseape.apipaseape.application.repository.IClienteRepository;
-import com.paseape.apipaseape.application.repository.IMascotaRepository;
-import com.paseape.apipaseape.application.repository.IPaseadorRepository;
-import com.paseape.apipaseape.application.repository.IUsuarioEstadoRepository;
-import com.paseape.apipaseape.application.repository.IUsuarioRepository;
-import com.paseape.apipaseape.domain.entity.Cliente;
-import com.paseape.apipaseape.domain.entity.Paseador;
-import com.paseape.apipaseape.domain.entity.PaseadorEstadoVerificacion;
-import com.paseape.apipaseape.domain.entity.Usuario;
-import com.paseape.apipaseape.domain.entity.UsuarioEstado;
 import com.paseape.apipaseape.infrastructure.dto.request.ActualizarEstadoUsuarioReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.ActualizarVerificacionPaseadorReqDto;
 import com.paseape.apipaseape.infrastructure.dto.response.MascotaResDto;
@@ -27,9 +19,7 @@ import com.paseape.apipaseape.infrastructure.mapper.dto.IUsuarioAdminDtoMapper;
 
 import java.util.List;
 
-import static com.paseape.apipaseape.infrastructure.constant.Constant.ESTADO_LOGICO_ACTIVO;
-import static com.paseape.apipaseape.infrastructure.constant.Constant.ID_APROBADO;
-import static com.paseape.apipaseape.infrastructure.constant.Constant.ID_CLIENTE;
+import static com.paseape.apipaseape.infrastructure.constant.Constant.*;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +33,7 @@ public class AdminUsuarioService {
     private final IUsuarioAdminDtoMapper usuarioAdminDtoMapper;
     private final IMascotaDtoMapper mascotaDtoMapper;
     private final IPaseadorAdminDtoMapper paseadorAdminDtoMapper;
+    private final IDigitalDocumentRepository digitalDocumentRepository;
 
     // --- Usuarios ---
 
@@ -129,6 +120,7 @@ public class AdminUsuarioService {
     @Transactional(rollbackFor = Exception.class)
     public PaseadorAdminResDto actualizarVerificacion(String uuid, ActualizarVerificacionPaseadorReqDto reqDto) throws BadRequestException {
         Paseador paseador = paseadorRepository.findByUuid(uuid);
+        DigitalDocument antecedente = digitalDocumentRepository.findByFolderIdAndDigitalDocumentTypeId(paseador.getUsuario().getFolderDigitalDocument().getId(), ID_DOC_ANTECEDENTE_POLICIAL);
         if (paseador == null) {
             throw new BadRequestException("El paseador especificado no existe.");
         }
@@ -138,7 +130,7 @@ public class AdminUsuarioService {
             throw new BadRequestException("El estado de verificacion es obligatorio.");
         }
 
-        if (nuevoEstado == ID_APROBADO && !StringUtils.hasText(paseador.getAntecedentesPolicialesUrl())) {
+        if (nuevoEstado == ID_APROBADO && antecedente == null) {
             throw new BadRequestException("No se puede aprobar al paseador: no ha adjuntado antecedentes policiales.");
         }
 
