@@ -10,6 +10,7 @@ import com.paseape.apipaseape.domain.entity.Mascota;
 import com.paseape.apipaseape.domain.entity.Usuario;
 import com.paseape.apipaseape.infrastructure.dto.response.ClienteResDto;
 import com.paseape.apipaseape.infrastructure.dto.response.DocumentUrlResDto;
+import com.paseape.apipaseape.infrastructure.dto.response.MascotaResDto;
 import com.paseape.apipaseape.infrastructure.dto.response.UsuarioResDto;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
 import com.paseape.apipaseape.infrastructure.mapper.dto.IClienteDtoMapper;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.security.Principal;
+import java.util.ArrayList;
 import java.util.List;
 
 import static com.paseape.apipaseape.infrastructure.constant.Constant.ID_DOC_FOTO_MASCOTA;
@@ -31,6 +33,7 @@ import static com.paseape.apipaseape.infrastructure.constant.Constant.ID_DOC_FOT
 public class ClienteService {
 
     private final DigitalDocumentService digitalDocumentService;
+    private final MascotaService mascotaService;
 
     private final IClienteRepository clienteRepository;
     private final IUsuarioRepository usuarioRepository;
@@ -52,9 +55,15 @@ public class ClienteService {
         };
 
         List<Mascota> mascotas = mascotaRepository.findAllByClienteId(cliente.getId());
+        List<MascotaResDto> mascotaResDtos = new ArrayList<>();
+        if (mascotas != null) {
+            for (Mascota mascota : mascotas) {
+                mascotaResDtos.add(mascotaService.poblarRespuestaMascota(mascota));
+            }
+        }
 
         UsuarioResDto usuarioResDto = usuarioDtoMapper.toResDto(usuario,cliente,null, clienteDtoMapper,null);
-        usuarioResDto.getCliente().setMascotas(mascotaDtoMapper.toResDtoList(mascotas));
+        usuarioResDto.getCliente().setMascotas(mascotaResDtos);
         usuarioResDto.setFotoPerfilUrl(digitalDocumentService.urlFotoPerfil(usuario));
 
         return usuarioResDto;

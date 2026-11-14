@@ -213,7 +213,7 @@ public class MascotaService {
         return digitalDocumentService.subirFotoMascota(mascotaUuid, cliente.getId(), file);
     }
 
-    private MascotaResDto poblarRespuestaMascota(Mascota mascota) throws BadRequestException {
+    public MascotaResDto poblarRespuestaMascota(Mascota mascota) throws BadRequestException {
         MascotaResDto dto = mascotaDtoMapper.toResDto(mascota);
         if (mascota.getFolderDigitalDocument() != null && mascota.getFolderDigitalDocument().getId() != null) {
             DigitalDocument fotoMascota = digitalDocumentRepository.findByFolderIdAndDigitalDocumentTypeId(mascota.getFolderDigitalDocument().getId(), ID_DOC_FOTO_MASCOTA);
