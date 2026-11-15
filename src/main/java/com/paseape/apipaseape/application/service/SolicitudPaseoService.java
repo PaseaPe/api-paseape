@@ -17,15 +17,19 @@ import com.paseape.apipaseape.infrastructure.dto.response.UbicacionEnVivoResDto;
 import com.paseape.apipaseape.infrastructure.dto.response.SolicitudPaseoRecorridoResDto;
 import com.paseape.apipaseape.infrastructure.mapper.dto.ISolicitudPaseoUbicacionEnVivoDtoMapper;
 import com.paseape.apipaseape.infrastructure.mapper.dto.ISolicitudPaseoRecorridoDtoMapper;
+
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+
 import com.paseape.apipaseape.domain.entity.SolicitudPaseoUbicacionEnVivo;
 import com.paseape.apipaseape.infrastructure.dto.request.RegistrarUbicacionesBatchReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.UbicacionPuntoReqDto;
 import com.paseape.apipaseape.infrastructure.dto.response.BatchIngestaResDto;
 import com.paseape.apipaseape.infrastructure.util.GeoDistanceCalculator;
 import com.paseape.apipaseape.infrastructure.util.PolylineDeltaEncoder;
+
 import java.time.ZoneOffset;
+
 import com.paseape.apipaseape.application.repository.ITipoDuracionPaseoRepository;
 import com.paseape.apipaseape.application.repository.IUsuarioRepository;
 import com.paseape.apipaseape.domain.entity.BloqueHorario;
@@ -256,8 +260,8 @@ public class SolicitudPaseoService {
             int maxMascotasBloque = disp.getMaxMascotas() != null
                     ? disp.getMaxMascotas()
                     : (paseador.getMaxMascotasPredeterminado() != null
-                            ? paseador.getMaxMascotasPredeterminado()
-                            : Constant.CAPACIDAD_BASE_DEFAULT);
+                       ? paseador.getMaxMascotasPredeterminado()
+                       : Constant.CAPACIDAD_BASE_DEFAULT);
 
             Integer mascotasOcupadas = solicitudPaseoRepository.countMascotasOcupadas(
                     paseador.getId(),
@@ -1009,6 +1013,9 @@ public class SolicitudPaseoService {
             velocidadPromedioKmh = distanciaMetros.divide(BigDecimal.valueOf(duracionSegundos), 6, RoundingMode.HALF_UP)
                     .multiply(BigDecimal.valueOf(3.6))
                     .setScale(2, RoundingMode.HALF_UP);
+            if (velocidadPromedioKmh.compareTo(BigDecimal.valueOf(999.99)) > 0) {
+                velocidadPromedioKmh = BigDecimal.valueOf(999.99);
+            }
         }
 
         SolicitudPaseoRecorrido recorrido = SolicitudPaseoRecorrido.builder()
@@ -1027,6 +1034,10 @@ public class SolicitudPaseoService {
         if (enVivo != null) {
             solicitudPaseoUbicacionEnVivoRepository.deleteBySolicitudPaseoId(guardada.getId());
         }
+
+        paseador.incrementarPaseosCompletados();
+        paseadorRepository.save(paseador);
+
 
         // Notificación interna para el cliente
         Usuario destinatario = guardada.getCliente() != null ? guardada.getCliente().getUsuario() : null;

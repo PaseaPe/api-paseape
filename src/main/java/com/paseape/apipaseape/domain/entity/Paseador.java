@@ -35,4 +35,8 @@ public class Paseador {
     private LocalDateTime actualizadoEl;
     private String creadoPor;
     private String actualizadoPor;
+
+    public void incrementarPaseosCompletados() {
+        this.paseosCompletados = (this.paseosCompletados == null ? 0 : this.paseosCompletados) + 1;
+    }
 }

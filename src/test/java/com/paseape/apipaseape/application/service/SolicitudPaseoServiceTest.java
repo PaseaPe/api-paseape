@@ -1059,6 +1059,10 @@ class SolicitudPaseoServiceTest {
 
         verify(solicitudPaseoUbicacionEnVivoRepository).deleteBySolicitudPaseoId(100L);
 
+        ArgumentCaptor<Paseador> paseadorCaptor = ArgumentCaptor.forClass(Paseador.class);
+        verify(paseadorRepository).save(paseadorCaptor.capture());
+        assertEquals(1, paseadorCaptor.getValue().getPaseosCompletados());
+
         ArgumentCaptor<Notificacion> notifCaptor = ArgumentCaptor.forClass(Notificacion.class);
         verify(notificacionRepository).save(notifCaptor.capture());
         Notificacion notif = notifCaptor.getValue();
@@ -1104,6 +1108,7 @@ class SolicitudPaseoServiceTest {
         assertEquals(BigDecimal.ZERO, recorridoGuardado.getVelocidadPromedioKmh());
 
         verify(solicitudPaseoUbicacionEnVivoRepository, never()).deleteBySolicitudPaseoId(anyLong());
+        verify(paseadorRepository).save(any(Paseador.class));
         verify(notificacionRepository).save(any(Notificacion.class));
     }
 
