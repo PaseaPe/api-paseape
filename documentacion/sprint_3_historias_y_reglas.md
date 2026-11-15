@@ -1,6 +1,6 @@
 # Especificaciones y Reglas de Negocio - SPRINT 3 (api-paseape)
 
-Este documento detalla los requerimientos funcionales, el modelo físico de persistencia, las reglas de negocio y la arquitectura técnica para las Historias de Usuario del **SPRINT 3** del backend **api-paseape**, enfocado en el inicio del servicio, la telemetría GPS acumulativa en tiempo real, la supervisión en vivo por el cliente y la consolidación histórica del recorrido (HU27, HU23, HU26, HU24).
+Este documento detalla los requerimientos funcionales, el modelo físico de persistencia, las reglas de negocio y la arquitectura técnica para las Historias de Usuario del **SPRINT 3** del backend **api-paseape**, enfocado en el inicio del servicio, la telemetría GPS acumulativa en tiempo real, la supervisión en vivo por el cliente y la consolidación histórica del recorrido (HU27, HU23, HU26, HU24, HU28, HU29, HU30, HU31).
 
 ---
 
@@ -327,20 +327,106 @@ CREATE INDEX `idx_spr_solicitud_estado` ON `solicitud_paseo_recorrido` (`solicit
 
 ---
 
-### E. Finalización del Paseo y Consolidación a Histórico
-- **Rol:** Paseador
-- **Estado:** **IMPLEMENTADO**
-- **Descripción:** Cierre formal del servicio de paseo por parte del paseador, consolidación inmutable de la ruta a la tabla de histórico y actualización del estado del paseo a `FINALIZADA` (6).
-- **Endpoint:** `PATCH /paseador/solicitudes/{uuid}/finalizar`
-- **Alcance Desarrollado:**
-  - Validación sintáctica de UUID en `SolicitudPaseoValidator.validateFinalizarPaseo` (Estándar Mortgage).
-  - Lógica atómica en `SolicitudPaseoService.finalizarPaseo` para:
-    * Verificación de titularidad del paseador autenticado y estado estricto `EN_CURSO` (5).
-    * Cálculo de duración real en segundos (`ChronoUnit.SECONDS.between(inicioReal, finReal)`) y velocidad promedio en km/h ($(\text{distancia} / \text{duracion}) \times 3.6$).
-    * Inserción directa inmutable en `solicitud_paseo_recorrido` y eliminación (`DELETE`) del registro transitorio en `solicitud_paseo_ubicacion_en_vivo`.
-    * Creación y persistencia de la notificación interna para el cliente en `notificaciones` (`tipo_notificacion_id = 5` [`ID_TIPO_NOTIFICACION_PASEO_FINALIZADO`]).
-  - Exposición de la ruta HTTP en `SolicitudPaseoPaseadorController`.
-  - Pruebas unitarias completas en JUnit 5 + Mockito cubriendo flujos exitosos y excepciones de negocio (`BadRequestException`).
+### E. HU28 – Finalizar el paseo
+- **Identificador:** HU28 | **Rol:** Paseador | **Estimación:** 1 día | **Prioridad:** 96 | **Puntos de historia:** 2
+- **Dependencias:** HU27 (Iniciar el paseo)
+- **Estado:** **IMPLEMENTADO Y VERIFICADO**
+- **Descripción:** "Como paseador de mascotas, quiero finalizar formalmente un paseo activo, para registrar el término del servicio, detener el seguimiento GPS y permitir que el dueño consulte el resumen del paseo."
+
+#### Criterios de Aceptación
+1. **Escenario 1 – Finalización exitosa:** Dado que el paseo se encuentra en curso (`EN_CURSO` [5]), cuando el paseador seleccione "Finalizar paseo" y confirme la acción, el sistema registra la fecha y hora de término (`fecha_hora_fin_real`) y cambia el estado a `FINALIZADA` (6).
+2. **Escenario 2 – Cálculo de duración y métricas:** Dado que el paseo tiene registrada su hora de inicio y de término, el sistema calcula la duración real en segundos, consolida la ruta acumulada en `solicitud_paseo_recorrido`, libera el buffer en vivo e incrementa el contador de paseos completados del paseador.
+
+#### Detalle de Implementación Técnica Realizada
+- **Endpoint:** `PATCH /api-paseape/paseador/solicitudes/{uuid}/finalizar`
+- **Controlador:** `SolicitudPaseoPaseadorController.java` (`finalizarPaseo`)
+  - Extrae `userEmail` mediante `resolverUserEmail(principal, authHeader)`.
+  - Valida previamente con `solicitudPaseoValidator.validateFinalizarPaseo(userEmail, uuid)`.
+  - Invoca `solicitudPaseoService.finalizarPaseo(userEmail, uuid)`.
+  - Retorna `ResponseDto<SolicitudPaseoResDto>` con HTTP 200 y mensaje `Constant.MSJ_PASEO_FINALIZADO_EXITO`.
+- **Validador:** `SolicitudPaseoValidator.java` (`validateFinalizarPaseo`)
+  - Sigue el estándar Mortgage (`docs/agents/validators.md`): encapsula comprobaciones en `try/catch` con `BadRequestException` y retorna `BuildErrorForValidation(...)`.
+  - Verifica sesión autenticada (`userEmail`), formato UUID v4, existencia de usuario y perfil `Paseador` activo.
+  - Verifica existencia de la solicitud y titularidad estricta del paseador autenticado.
+- **Lógica de Negocio en Servicio:** `SolicitudPaseoService.java` (`finalizarPaseo`)
+  - Verifica estado estricto `EN_CURSO` (5); rechaza si ya está en `FINALIZADA` (6) (`Constant.MSJ_ERROR_PASEO_YA_FINALIZADO`) o en cualquier otro estado (`Constant.MSJ_ERROR_SOLICITUD_NO_FINALIZABLE`).
+  - Transiciona el estado a `FINALIZADA` (6) y asigna `fechaHoraFinReal = LocalDateTime.now()`.
+  - Consulta el buffer en vivo (`solicitudPaseoUbicacionEnVivoRepository.findBySolicitudPaseoId(guardada.getId())`).
+  - Calcula `duracionSegundos = ChronoUnit.SECONDS.between(fechaHoraInicioReal, fechaHoraFinReal)` (mínimo 0) y `velocidadPromedioKmh = (distanciaMetros / duracionSegundos) * 3.6` (con tope `999.99`).
+  - Persiste el recorrido inmutable en `solicitud_paseo_recorrido` con `TipoOrigenTraza(Constant.ID_ORIGEN_TRAZA_GPS_TIEMPO_REAL)`.
+  - Elimina la fila transitoria en caliente mediante `solicitudPaseoUbicacionEnVivoRepository.deleteBySolicitudPaseoId(guardada.getId())` si existía.
+  - Incrementa el contador del paseador (`paseador.incrementarPaseosCompletados()`) y guarda la entidad `Paseador`.
+  - Dispara el registro de notificación interna de finalización (HU29).
+
+---
+
+### F. HU29 – Recibir una notificación cuando termine el paseo
+- **Identificador:** HU29 | **Rol:** Cliente (Dueño) | **Estimación:** 1 día | **Prioridad:** 60 | **Puntos de historia:** 2
+- **Dependencias:** HU28 (Finalizar el paseo)
+- **Estado:** **IMPLEMENTADO Y VERIFICADO**
+- **Descripción:** "Como dueño de una mascota, quiero recibir una notificación cuando el paseador finalice el servicio, para saber que mi mascota terminó su paseo y consultar el resumen del recorrido."
+
+#### Criterios de Aceptación
+1. **Escenario 1 – Notificación de finalización:** Dado que el paseo está en curso, cuando el paseador finalice el servicio correctamente, el sistema genera y persiste una notificación interna dirigida al dueño indicando que el paseo ha terminado.
+2. **Escenario 2 – Información de la notificación:** La notificación incluye el título estandarizado, el nombre del paseador, el código de reserva del paseo y la referencia directa al servicio para consultar el recorrido y calificarlo.
+
+#### Detalle de Implementación Técnica Realizada
+- **Punto de Disparo:** Orquestado directamente dentro de `SolicitudPaseoService.finalizarPaseo` tras consolidar el recorrido e incrementar las métricas del paseador.
+- **Notificación Interna en BD (`notificaciones`):**
+  - Se construye la entidad de dominio `Notificacion` con `uuid = UUID.randomUUID().toString()`.
+  - Tipo de evento: `TipoNotificacion(Constant.ID_TIPO_NOTIFICACION_PASEO_FINALIZADO)` (ID `5`).
+  - Título estandarizado: `Constant.TITULO_NOTIF_PASEO_FINALIZADO`.
+  - Mensaje: `"El paseador " + paseadorNombre + " ha finalizado el paseo " + guardada.getCodigoReserva() + " de tus mascotas. Ya puedes revisar el recorrido y calificar el servicio."`
+  - Referencia cruzada: `referenciaId = guardada.getId()` y `referenciaTipo = Constant.REFERENCIA_TIPO_SOLICITUD_PASEO`.
+  - Remitente: `Usuario` del paseador | Destinatario: `Usuario` del cliente (`guardada.getCliente().getUsuario()`).
+  - Estado inicial: `leido = false`, `estado = Constant.ESTADO_LOGICO_ACTIVO`.
+  - Persistencia mediante `INotificacionRepository.save(notificacion)` (sin despacho de correo externo).
+
+---
+
+### G. HU30 – Consultar el historial de paseos como dueño
+- **Identificador:** HU30 | **Rol:** Cliente (Dueño) | **Estimación:** 1 día | **Prioridad:** 60 | **Puntos de historia:** 2
+- **Dependencias:** HU04, HU28, HU29
+- **Estado:** **IMPLEMENTADO Y VERIFICADO**
+- **Descripción:** "Como dueño de una mascota, quiero consultar el historial de los paseos realizados por mis mascotas, para revisar los servicios anteriores, conocer sus detalles y llevar un seguimiento de la actividad de mis mascotas."
+
+#### Criterios de Aceptación
+1. **Escenario 1 – Visualización del historial:** Dado que el dueño inició sesión y tiene paseos completados o cerrados, cuando acceda a la sección de historial, el sistema muestra sus servicios ordenados del más reciente al más antiguo de forma paginada.
+2. **Escenario 2 – Consulta de detalles de un paseo:** Dado que el dueño visualiza su historial, cuando seleccione un paseo, el sistema muestra los detalles completos disponibles del servicio, las mascotas (con su foto) y el paseador asignado.
+
+#### Detalle de Implementación Técnica Realizada
+- **Escenario 1 – Listado Paginado de Historial del Cliente:**
+  - **Endpoint:** `GET /api-paseape/cliente/solicitudes?tab=HISTORIAL&page=0&size=10`
+  - **Controlador:** `SolicitudPaseoClienteController.java` (`obtenerBandejaCliente`).
+  - **Validador:** `SolicitudPaseoValidator.java` (`validateConsultaBandejaCliente`) — valida que `tab` sea `ACTIVOS`, `PENDIENTES` o `HISTORIAL`, y que `page >= 0` y `1 <= size <= Constant.SIZE_MAXIMO`.
+  - **Servicio:** `SolicitudPaseoService.java` (`obtenerBandejaCliente`) — para `Constant.TAB_CLIENTE_HISTORIAL`, filtra los estados históricos `RECHAZADA` (3), `CANCELADA` (4), `FINALIZADA` (6) y `VENCIDA` (7) del cliente autenticado mediante `findByClienteIdAndEstadosPaginado`, ordenados descendentemente (`Sort.by(DESC, "actualizadoEl").and(Sort.by(DESC, "creadoEl"))`), y ensambla las mascotas por lote (`findAllBySolicitudPaseoIdInWithDetails`) retornando `PageResponseDto<SolicitudPaseoResDto>`.
+- **Escenario 2 – Consulta de Detalle Completo de un Paseo:**
+  - **Endpoint:** `GET /api-paseape/solicitudes/{uuid}` (transversal).
+  - **Controlador:** `SolicitudPaseoDetalleController.java` (`obtenerDetalleSolicitud`) — controlador independiente sin `BaseController` (estándar Mortgage).
+  - **Validador:** `SolicitudPaseoDetalleValidator.java` (`validateObtenerDetalle`) — valida sesión, formato UUID v4, existencia de la solicitud y autorización (solo el cliente dueño, el paseador asignado o un administrador).
+  - **Servicio:** `SolicitudPaseoDetalleService.java` (`obtenerDetalle`) — consulta `findByUuidWithDetails` y `findAllBySolicitudPaseoIdWithDetails` (con catálogos y `folderDigitalDocument`), mapea vía `ISolicitudPaseoDetalleDtoMapper.toDetalleResDto(...)` a `SolicitudPaseoDetalleResDto` (incluyendo detalle del paseador con `telefono` desde `Usuario`, fechas reales de inicio/fin, montos y lista completa de mascotas con `foto_mascota` resuelta vía `DigitalDocumentService.descargarDocumento`). Complementado con `GET /solicitudes/{uuid}/recorrido` (HU24) para el mapa del recorrido.
+
+---
+
+### H. HU31 – Consultar el historial de servicios como paseador
+- **Identificador:** HU31 | **Rol:** Paseador | **Estimación:** 1 día | **Prioridad:** 40 | **Puntos de historia:** 2
+- **Dependencias:** HU07, HU28
+- **Estado:** **IMPLEMENTADO Y VERIFICADO**
+- **Descripción:** "Como paseador de mascotas, quiero consultar el historial de los paseos que he realizado, para llevar un registro de mis servicios y revisar la información de cada paseo completado."
+
+#### Criterios de Aceptación
+1. **Escenario 1 – Visualización del historial:** Dado que el paseador inició sesión y tiene servicios completados o cerrados, cuando acceda a la sección de historial, el sistema muestra sus paseos realizados ordenados del más reciente al más antiguo de forma paginada.
+2. **Escenario 2 – Consulta de detalles de un servicio:** Dado que el paseador visualiza su historial, cuando seleccione un paseo, el sistema muestra la información disponible del servicio, incluyendo la(s) mascota(s), la fecha, horarios reales/duración y el estado.
+
+#### Detalle de Implementación Técnica Realizada
+- **Escenario 1 – Listado Paginado de Historial del Paseador:**
+  - **Endpoint:** `GET /api-paseape/paseador/solicitudes?tab=HISTORIAL&page=0&size=10`
+  - **Controlador:** `SolicitudPaseoPaseadorController.java` (`obtenerBandejaPaseador`).
+  - **Validador:** `SolicitudPaseoValidator.java` (`validateConsultaBandejaPaseador`) — valida `tab` (`INMEDIATAS`, `MIS_PASEOS`, `EN_CURSO`, `HISTORIAL`) y paginación (`page`, `size`).
+  - **Servicio:** `SolicitudPaseoService.java` (`obtenerBandejaPaseador`) — para `Constant.TAB_HISTORIAL`, consulta `findByPaseadorIdAndEstadosPaginado` filtrando los estados `RECHAZADA` (3), `CANCELADA` (4), `FINALIZADA` (6) y `VENCIDA` (7) del paseador autenticado, ordenados por `actualizadoEl DESC, creadoEl DESC`, ensamblando las mascotas asociadas en `PageResponseDto<SolicitudPaseoResDto>`.
+- **Escenario 2 – Consulta de Detalle Completo del Servicio:**
+  - **Endpoint:** `GET /api-paseape/solicitudes/{uuid}` (transversal, compartido con HU30).
+  - **Controlador / Validador / Servicio:** `SolicitudPaseoDetalleController` -> `SolicitudPaseoDetalleValidator` (verifica que el usuario autenticado sea el paseador asignado a la solicitud) -> `SolicitudPaseoDetalleService`, devolviendo `SolicitudPaseoDetalleResDto` con fechas (`fecha_programada`, `fecha_hora_inicio_real`, `fecha_hora_fin_real`), duración (`tipo_duracion_paseo_descripcion`, `duracion_minutos`), estado, datos de las mascotas (con `foto_mascota`) y resumen económico. Complementado con `GET /solicitudes/{uuid}/recorrido` (HU24) para visualizar el trazado histórico.
 
 ---
 
@@ -354,7 +440,10 @@ Todas las rutas operan bajo el context path `/api-paseape` y retornan `ResponseD
 | `POST` | `/paseador/solicitudes/{uuid}/ubicaciones` | `PASEADOR` | Ingesta en lote de coordenadas GPS con acumulación directa en caliente (HU26). | **IMPLEMENTADO** |
 | `GET` | `/cliente/solicitudes/{uuid}/ubicacion-actual` | `CLIENTE` | Retorna última posición GPS conocida del paseador para monitoreo en vivo (HU24). | **IMPLEMENTADO** |
 | `GET` | `/solicitudes/{uuid}/recorrido` | `CLIENTE`, `PASEADOR`, `ADMIN` | Consulta el recorrido consolidado inmutable post-paseo (Strava-like) (HU24). | **IMPLEMENTADO** |
-| `PATCH` | `/paseador/solicitudes/{uuid}/finalizar` | `PASEADOR` | Concluye el paseo, consolida el recorrido a histórico y libera el buffer en vivo. | **IMPLEMENTADO** |
+| `PATCH` | `/paseador/solicitudes/{uuid}/finalizar` | `PASEADOR` | Concluye el paseo, consolida el recorrido a histórico, incrementa contador y notifica al dueño (HU28, HU29). | **IMPLEMENTADO** |
+| `GET` | `/cliente/solicitudes?tab=HISTORIAL` | `CLIENTE` | Lista paginada del historial de paseos del dueño ordenado del más reciente al más antiguo (HU30). | **IMPLEMENTADO** |
+| `GET` | `/paseador/solicitudes?tab=HISTORIAL` | `PASEADOR` | Lista paginada del historial de servicios del paseador ordenado del más reciente al más antiguo (HU31). | **IMPLEMENTADO** |
+| `GET` | `/solicitudes/{uuid}` | `CLIENTE`, `PASEADOR`, `ADMIN` | Consulta el detalle completo de la solicitud, mascotas (con foto) y paseador asignado con teléfono (HU30, HU31). | **IMPLEMENTADO** |
 
 ---
 
@@ -370,6 +459,7 @@ Conforme a `docs/agents/mappers-dtos.md`: clases estándar con Lombok, sin `reco
 * **`BatchIngestaResDto`**: `puntosProcesados`, `paseoActivo`.
 * **`UbicacionEnVivoResDto`**: `uuid`, `solicitudPaseoUuid`, `latitud`, `longitud`, `precisionM`, `velocidadMs`, `rumboGrados`, `fechaHoraGps`, `senalDegradada`.
 * **`SolicitudPaseoRecorridoResDto`**: `uuid`, `solicitudPaseoUuid`, `distanciaMetros`, `duracionSegundos`, `velocidadPromedioKmh`, `coordenadasCodificadas`, `coordenadasTotalPuntos`, `tipoOrigenTrazaDescripcion`, `fechaHoraInicio`, `fechaHoraFin`.
+* **`SolicitudPaseoDetalleResDto`**: `uuid`, `codigoReserva`, modalidad, estado, método de pago, duración (`tipoDuracionPaseoId`, `tipoDuracionPaseoDescripcion`, `duracionMinutos`), distrito, dirección, `fechaProgramada`, bloque horario, montos, marcas de tiempo reales (`fechaHoraAceptada`, `fechaHoraInicioReal`, `fechaHoraFinReal`), `clienteUuid`, `clienteNombreCompleto`, `paseador` (`SolicitudPaseadorDetalleResDto` con `telefono`, `correo`, `fotoPerfilUrl`, tarifa, calificación y paseos completados) y `mascotas` (`List<SolicitudMascotaDetalleResDto>` con `fotoMascota`).
 
 ---
 
@@ -413,76 +503,69 @@ Siguiendo el estándar Mortgage (`docs/agents/validators.md`), el validador lanz
 - [x] **Entidades de Dominio:** `TipoOrigenTraza`, `SolicitudPaseoUbicacionEnVivo`, `SolicitudPaseoRecorrido`.
 - [x] **Entidades JPA (DBO):** Con herencia de `Auditable`, `@SQLRestriction("estado = 1")` e identificador canónico `uuid`.
 - [x] **Puertos de Repositorio:** `ITipoOrigenTrazaRepository`, `ISolicitudPaseoUbicacionEnVivoRepository`, `ISolicitudPaseoRecorridoRepository` (sin `Optional<T>` en capa de aplicación).
-- [x] **Adaptadores JPA y Mappers:** MapStruct DBO (`*DboMapper`) y DTO (`*DtoMapper`) en infraestructura.
+- [x] **Adaptadores JPA y Mappers:** MapStruct DBO (`*DboMapper`) y DTO (`*DtoMapper`, incluyendo `ISolicitudPaseoDetalleDtoMapper`) en infraestructura.
 - [x] **Utilidades Geoespaciales:** `GeoDistanceCalculator` (Haversine $R = 6,371,000\text{ m}$) y `PolylineDeltaEncoder` (Google Encoded Polyline delta compressor).
-- [x] **Refactorización de Validadores:** `SolicitudPaseoValidator` alineado estrictamente a `docs/agents/validators.md` (Mortgage pattern con `try/catch`, `BadRequestException`, `BuildErrorForValidation(...)` retornando `ResponseDto<?>`).
+- [x] **Refactorización de Validadores:** `SolicitudPaseoValidator` y `SolicitudPaseoDetalleValidator` alineados estrictamente a `docs/agents/validators.md` (Mortgage pattern con `try/catch`, `BadRequestException`, `BuildErrorForValidation(...)` retornando `ResponseDto<?>`).
 - [x] **HU27 (Iniciar Paseo):** `PATCH /paseador/solicitudes/{uuid}/iniciar` en `SolicitudPaseoPaseadorController` y `SolicitudPaseoService`.
 - [x] **HU23 (Notificación de Inicio):** Notificación interna en BD y despacho asíncrono de correo Brevo implementados en `SolicitudPaseoService`.
 - [x] **HU26 (Telemetría GPS por Lotes):** `POST /paseador/solicitudes/{uuid}/ubicaciones` con acumulador en caliente $O(1)$ y filtro de ruido GPS $\Delta d \ge 3.0\text{ m}$.
 - [x] **HU24 (Monitoreo en Vivo Short Polling):** `GET /cliente/solicitudes/{uuid}/ubicacion-actual` con diagnóstico de señal degradada (> 45 s) y espera de primera señal.
 - [x] **HU24 (Recorrido Consolidado Strava-like):** `GET /solicitudes/{uuid}/recorrido` en controlador independiente `SolicitudPaseoRecorridoController` con acceso multi-rol (`CLIENTE`, `PASEADOR`, `ADMIN`).
-- [x] **Finalización del Paseo y Consolidación a Histórico:** `PATCH /paseador/solicitudes/{uuid}/finalizar` (Validador `validateFinalizarPaseo`, lógica en servicio `finalizarPaseo`, endpoint en `SolicitudPaseoPaseadorController` y notificación interna al cliente).
+- [x] **HU28 & HU29 (Finalización del Paseo y Notificación):** `PATCH /paseador/solicitudes/{uuid}/finalizar` (Validador `validateFinalizarPaseo`, lógica en servicio `finalizarPaseo`, consolidación a histórico, incremento de paseos completados y notificación interna al cliente).
+- [x] **HU30 & HU31 (Historial Cliente/Paseador y Detalle Transversal):** Bandejas paginadas `tab=HISTORIAL` en `SolicitudPaseoClienteController` y `SolicitudPaseoPaseadorController`, junto al endpoint transversal `GET /solicitudes/{uuid}` en `SolicitudPaseoDetalleController` con detalle de mascotas (y foto) y paseador (con teléfono).
 - [x] **Pruebas Unitarias:** Cobertura de validadores, controladores y servicios de las historias implementadas.
 
 ### 11.2. Funcionalidades Pendientes de Desarrollo
-- *Todas las funcionalidades del Sprint 3 han sido completadas e integradas.*
+- *Todas las funcionalidades del Sprint 3 (HU23, HU24, HU26, HU27, HU28, HU29, HU30 y HU31) han sido completadas e integradas.*
 
 ---
 
 ## 12. Trazabilidad de Clases e Implementación Técnica Realizada
 
-> **Nota de Alcance:** Esta sección registra única y exclusivamente las clases, métodos y artefactos que ya han sido **desarrollados y probados** en el repositorio. Las funcionalidades pendientes (como la finalización del paseo) no forman parte de este inventario técnico.
-
-A continuación se detalla el mapa exhaustivo de clases, interfaces y archivos implementados en el backend siguiendo estrictamente la Arquitectura Limpia y DDD (Estándar Mortgage):
+> **Nota de Alcance:** Esta sección registra las clases, métodos y artefactos desarrollados y probados en el repositorio para el Sprint 3 siguiendo la Arquitectura Limpia y DDD (Estándar Mortgage).
 
 ### 12.1. Capa de Dominio (`domain`)
-* `com.paseape.apipaseape.domain.model.TipoOrigenTraza`: Modelo del catálogo de orígenes de traza (GPS_TIEMPO_REAL, RUTA_INTERPOLADA, CIERRE_ADMINISTRATIVO).
-* `com.paseape.apipaseape.domain.model.SolicitudPaseoUbicacionEnVivo`: Modelo del buffer de estado único en caliente para la posición actual y la polilínea delta incremental.
-* `com.paseape.apipaseape.domain.model.SolicitudPaseoRecorrido`: Modelo del recorrido histórico consolidado post-paseo inmutable.
+* `com.paseape.apipaseape.domain.entity.TipoOrigenTraza`: Modelo del catálogo de orígenes de traza (GPS_TIEMPO_REAL, RUTA_INTERPOLADA, CIERRE_ADMINISTRATIVO).
+* `com.paseape.apipaseape.domain.entity.SolicitudPaseoUbicacionEnVivo`: Modelo del buffer de estado único en caliente para la posición actual y la polilínea delta incremental.
+* `com.paseape.apipaseape.domain.entity.SolicitudPaseoRecorrido`: Modelo del recorrido histórico consolidado post-paseo inmutable.
 
 ### 12.2. Capa de Aplicación (`application`)
 * **Puertos de Repositorio:**
   * `com.paseape.apipaseape.application.repository.ITipoOrigenTrazaRepository`
   * `com.paseape.apipaseape.application.repository.ISolicitudPaseoUbicacionEnVivoRepository`: Operaciones `findBySolicitudPaseoId`, `findByUuid`, `save`, `deleteBySolicitudPaseoId`.
   * `com.paseape.apipaseape.application.repository.ISolicitudPaseoRecorridoRepository`: Operaciones `findBySolicitudPaseoId`, `findByUuid`, `save`.
-* **DTOs de Entrada y Salida:**
-  * `com.paseape.apipaseape.application.dto.request.UbicacionPuntoReqDto`
-  * `com.paseape.apipaseape.application.dto.request.RegistrarUbicacionesBatchReqDto`
-  * `com.paseape.apipaseape.application.dto.response.BatchIngestaResDto`
-  * `com.paseape.apipaseape.application.dto.response.UbicacionEnVivoResDto`
-  * `com.paseape.apipaseape.application.dto.response.SolicitudPaseoRecorridoResDto`
-* **Mappers de DTO (MapStruct):**
-  * `com.paseape.apipaseape.application.mapper.ISolicitudPaseoUbicacionEnVivoDtoMapper`
-  * `com.paseape.apipaseape.application.mapper.ISolicitudPaseoRecorridoDtoMapper`
-* **Lógica de Negocio y Orquestación:**
-  * `com.paseape.apipaseape.application.service.SolicitudPaseoService`: Métodos `iniciarPaseo`, `registrarUbicacionesTelemetria`, `obtenerUbicacionEnVivo`, `obtenerRecorridoConsolidado`.
+* **Servicios de Aplicación:**
+  * `com.paseape.apipaseape.application.service.SolicitudPaseoService`: Métodos `iniciarPaseo`, `registrarUbicacionesTelemetria`, `obtenerUbicacionEnVivo`, `obtenerRecorridoConsolidado`, `finalizarPaseo`, `obtenerBandejaCliente`, `obtenerBandejaPaseador`.
+  * `com.paseape.apipaseape.application.service.SolicitudPaseoDetalleService`: Método `obtenerDetalle` con resolución de fotos de mascotas vía `DigitalDocumentService`.
 
 ### 12.3. Capa de Infraestructura (`infrastructure`)
-* **Persistencia JPA (Adaptadores y DBOs):**
-  * `com.paseape.apipaseape.infrastructure.persistence.entity.TipoOrigenTrazaDbo`
-  * `com.paseape.apipaseape.infrastructure.persistence.entity.SolicitudPaseoUbicacionEnVivoDbo`
-  * `com.paseape.apipaseape.infrastructure.persistence.entity.SolicitudPaseoRecorridoDbo`
-  * `com.paseape.apipaseape.infrastructure.persistence.repository.ITipoOrigenTrazaJpaRepository`
-  * `com.paseape.apipaseape.infrastructure.persistence.repository.ISolicitudPaseoUbicacionEnVivoJpaRepository`
-  * `com.paseape.apipaseape.infrastructure.persistence.repository.ISolicitudPaseoRecorridoJpaRepository`
-  * `com.paseape.apipaseape.infrastructure.persistence.adapter.TipoOrigenTrazaAdapter`
-  * `com.paseape.apipaseape.infrastructure.persistence.adapter.SolicitudPaseoUbicacionEnVivoAdapter`
-  * `com.paseape.apipaseape.infrastructure.persistence.adapter.SolicitudPaseoRecorridoAdapter`
-  * `com.paseape.apipaseape.infrastructure.persistence.mapper.ISolicitudPaseoUbicacionEnVivoDboMapper`
-  * `com.paseape.apipaseape.infrastructure.persistence.mapper.ISolicitudPaseoRecorridoDboMapper`
-* **Algoritmos y Utilidades Geoespaciales:**
-  * `com.paseape.apipaseape.infrastructure.util.GeoDistanceCalculator`: Cálculo ortodrómico Haversine con radio terrestre de 6,371,000 metros.
-  * `com.paseape.apipaseape.infrastructure.util.PolylineDeltaEncoder`: Compresión y concatenación delta de coordenadas Google Encoded Polyline.
-* **Validación de Negocio:**
-  * `com.paseape.apipaseape.infrastructure.validator.SolicitudPaseoValidator`: Métodos `validateIniciarPaseo`, `validateRegistrarUbicaciones`, `validateObtenerUbicacionEnVivo`, `validateObtenerRecorridoConsolidado` retornando `ResponseDto<?>`.
-* **Controladores REST:**
-  * `com.paseape.apipaseape.infrastructure.controller.SolicitudPaseoPaseadorController`: Endpoints `PATCH /{uuid}/iniciar`, `POST /{uuid}/ubicaciones`.
-  * `com.paseape.apipaseape.infrastructure.controller.SolicitudPaseoClienteController`: Endpoint `GET /{uuid}/ubicacion-actual`.
-  * `com.paseape.apipaseape.infrastructure.controller.SolicitudPaseoRecorridoController`: Endpoint `GET /{uuid}/recorrido` (controlador independiente sin `BaseController`).
+* **DTOs de Entrada y Salida (`infrastructure/dto/`):**
+  * `UbicacionPuntoReqDto`, `RegistrarUbicacionesBatchReqDto`
+  * `BatchIngestaResDto`, `UbicacionEnVivoResDto`, `SolicitudPaseoRecorridoResDto`
+  * `SolicitudPaseoDetalleResDto`, `SolicitudPaseadorDetalleResDto`, `SolicitudMascotaDetalleResDto`
+* **Mappers de DTO (MapStruct - `infrastructure/mapper/dto/`):**
+  * `ISolicitudPaseoUbicacionEnVivoDtoMapper`
+  * `ISolicitudPaseoRecorridoDtoMapper`
+  * `ISolicitudPaseoDetalleDtoMapper`
+* **Persistencia JPA (Adaptadores, Entidades y DBO Mappers):**
+  * `TipoOrigenTrazaEntity`, `SolicitudPaseoUbicacionEnVivoEntity`, `SolicitudPaseoRecorridoEntity`
+  * `ITipoOrigenTrazaJpaRepository`, `ISolicitudPaseoUbicacionEnVivoJpaRepository`, `ISolicitudPaseoRecorridoJpaRepository`
+  * `TipoOrigenTrazaRepository`, `SolicitudPaseoUbicacionEnVivoRepository`, `SolicitudPaseoRecorridoRepository`
+  * `ITipoOrigenTrazaDboMapper`, `ISolicitudPaseoUbicacionEnVivoDboMapper`, `ISolicitudPaseoRecorridoDboMapper`
+* **Algoritmos y Utilidades Geoespaciales (`infrastructure/util/`):**
+  * `GeoDistanceCalculator`: Cálculo ortodrómico Haversine con radio terrestre de 6,371,000 metros.
+  * `PolylineDeltaEncoder`: Compresión y concatenación delta de coordenadas Google Encoded Polyline.
+* **Validación de Negocio (`infrastructure/validator/`):**
+  * `SolicitudPaseoValidator`: Métodos `validateIniciarPaseo`, `validateFinalizarPaseo`, `validateRegistrarUbicaciones`, `validateObtenerUbicacionEnVivo`, `validateObtenerRecorridoConsolidado`, `validateConsultaBandejaCliente`, `validateConsultaBandejaPaseador` retornando `ResponseDto<?>`.
+  * `SolicitudPaseoDetalleValidator`: Método `validateObtenerDetalle` retornando `ResponseDto<?>`.
+* **Controladores REST (`infrastructure/controller/`):**
+  * `SolicitudPaseoPaseadorController`: Endpoints `GET /`, `PATCH /{uuid}/iniciar`, `PATCH /{uuid}/finalizar`, `POST /{uuid}/ubicaciones`.
+  * `SolicitudPaseoClienteController`: Endpoints `GET /`, `GET /{uuid}/ubicacion-actual`.
+  * `SolicitudPaseoRecorridoController`: Endpoint `GET /{uuid}/recorrido` (controlador independiente sin `BaseController`).
+  * `SolicitudPaseoDetalleController`: Endpoint `GET /{uuid}` (controlador independiente sin `BaseController`).
 * **Migración de Base de Datos:**
   * `db/migration/V2.2.0__sprint_3_schema.sql`: Script DDL aplicado en Aiven MySQL Cloud.
 * **Pruebas Automatizadas:**
-  * `com.paseape.apipaseape.infrastructure.validator.SolicitudPaseoValidatorTest`
-  * `com.paseape.apipaseape.infrastructure.controller.SolicitudPaseoClienteControllerTest`
-  * `com.paseape.apipaseape.infrastructure.controller.SolicitudPaseoPaseadorControllerTest`
-  * `com.paseape.apipaseape.infrastructure.controller.SolicitudPaseoRecorridoControllerTest`
+  * `SolicitudPaseoValidatorTest`, `SolicitudPaseoDetalleValidatorTest`
+  * `SolicitudPaseoDetalleServiceTest`
+  * `SolicitudPaseoClienteControllerTest`, `SolicitudPaseoPaseadorControllerTest`, `SolicitudPaseoRecorridoControllerTest`, `SolicitudPaseoDetalleControllerTest`
