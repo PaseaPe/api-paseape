@@ -23,7 +23,7 @@ import com.paseape.apipaseape.infrastructure.dto.request.RegistrarUbicacionesBat
 import com.paseape.apipaseape.infrastructure.dto.request.UbicacionPuntoReqDto;
 import com.paseape.apipaseape.infrastructure.dto.response.ResponseDto;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.util.ObjectUtils;
 
@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+@RequiredArgsConstructor
 @Component
 public class SolicitudPaseoValidator {
 
@@ -49,41 +50,6 @@ public class SolicitudPaseoValidator {
     private final IBloqueHorarioRepository bloqueHorarioRepository;
 
     private static final Pattern UUID_PATTERN = Pattern.compile(Constant.REGEX_UUID);
-
-    @Autowired
-    public SolicitudPaseoValidator(
-            IDistritoLimaRepository distritoLimaRepository,
-            IUsuarioRepository usuarioRepository,
-            IPaseadorRepository paseadorRepository,
-            IClienteRepository clienteRepository,
-            ISolicitudPaseoRepository solicitudPaseoRepository,
-            IBloqueHorarioRepository bloqueHorarioRepository
-    ) {
-        this.distritoLimaRepository = distritoLimaRepository;
-        this.usuarioRepository = usuarioRepository;
-        this.paseadorRepository = paseadorRepository;
-        this.clienteRepository = clienteRepository;
-        this.solicitudPaseoRepository = solicitudPaseoRepository;
-        this.bloqueHorarioRepository = bloqueHorarioRepository;
-    }
-
-    public SolicitudPaseoValidator(
-            IDistritoLimaRepository distritoLimaRepository,
-            IUsuarioRepository usuarioRepository,
-            IPaseadorRepository paseadorRepository,
-            IClienteRepository clienteRepository,
-            ISolicitudPaseoRepository solicitudPaseoRepository
-    ) {
-        this(distritoLimaRepository, usuarioRepository, paseadorRepository, clienteRepository, solicitudPaseoRepository, null);
-    }
-
-    public SolicitudPaseoValidator(IDistritoLimaRepository distritoLimaRepository) {
-        this(distritoLimaRepository, null, null, null, null, null);
-    }
-
-    public SolicitudPaseoValidator() {
-        this(null, null, null, null, null, null);
-    }
 
     public ResponseDto<?> validateCrearInmediata(CrearSolicitudInmediataReqDto reqDto) {
         try {
