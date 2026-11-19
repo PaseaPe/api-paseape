@@ -13,6 +13,7 @@ import com.paseape.apipaseape.infrastructure.dto.response.SolicitudMascotaDetall
 import com.paseape.apipaseape.infrastructure.dto.response.SolicitudPaseoDetalleResDto;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
 import com.paseape.apipaseape.infrastructure.mapper.dto.ISolicitudPaseoDetalleDtoMapper;
+import com.paseape.apipaseape.infrastructure.util.UtilMethods;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,6 +63,14 @@ public class SolicitudPaseoDetalleService {
                     }
                 }
             }
+        }
+
+        if (detalleDto != null) {
+            detalleDto.setHoraVencimiento(UtilMethods.convertirUtcALima(detalleDto.getHoraVencimiento()));
+            detalleDto.setFechaHoraAceptada(UtilMethods.convertirUtcALima(detalleDto.getFechaHoraAceptada()));
+            detalleDto.setFechaHoraInicioReal(UtilMethods.convertirUtcALima(detalleDto.getFechaHoraInicioReal()));
+            detalleDto.setFechaHoraFinReal(UtilMethods.convertirUtcALima(detalleDto.getFechaHoraFinReal()));
+            detalleDto.setCreadoEl(UtilMethods.convertirUtcALima(detalleDto.getCreadoEl()));
         }
 
         return detalleDto;

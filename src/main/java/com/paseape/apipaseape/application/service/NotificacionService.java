@@ -8,6 +8,7 @@ import com.paseape.apipaseape.infrastructure.constant.MessageCodes;
 import com.paseape.apipaseape.infrastructure.dto.response.NotificacionResDto;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
 import com.paseape.apipaseape.infrastructure.mapper.dto.INotificacionDtoMapper;
+import com.paseape.apipaseape.infrastructure.util.UtilMethods;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,7 +29,12 @@ public class NotificacionService {
     public List<NotificacionResDto> listarNotificacionesNoLeidas(String userEmail) throws BadRequestException {
         Usuario usuario = obtenerUsuarioAutenticado(userEmail);
         List<Notificacion> notificaciones = notificacionRepository.findAllNoLeidasByDestinatarioUsuarioId(usuario.getId());
-        return notificacionDtoMapper.toResDtoList(notificaciones);
+        List<NotificacionResDto> respuesta = notificacionDtoMapper.toResDtoList(notificaciones);
+        for (NotificacionResDto dto : respuesta) {
+            dto.setFechaLeido(UtilMethods.convertirUtcALima(dto.getFechaLeido()));
+            dto.setCreadoEl(UtilMethods.convertirUtcALima(dto.getCreadoEl()));
+        }
+        return respuesta;
     }
 
     @Transactional(rollbackFor = Exception.class)
