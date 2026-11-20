@@ -159,17 +159,17 @@ public class CatalogoValidator {
 
     private void validateAdministrador(String userEmail) throws BadRequestException {
         if (ObjectUtils.isEmpty(userEmail) || userEmail.trim().isEmpty()) {
-            throw new BadRequestException(StatusCodes.Code401, MessageCodes.ResponseCodeE01, "Usuario no autenticado.");
+            throw new BadRequestException(MessageCodes.ResponseCodeE01, "Usuario no autenticado.");
         }
         Usuario usuario = usuarioRepository.findByCorreo(userEmail.trim().toLowerCase());
         if (usuario == null) {
-            throw new BadRequestException(StatusCodes.Code401, MessageCodes.ResponseCodeBR98, "No se encontró el usuario autenticado.");
+            throw new BadRequestException(MessageCodes.ResponseCodeBR98, "No se encontró el usuario autenticado.");
         }
         if (usuario.getUsuarioEstado() == null || usuario.getUsuarioEstado().getId() != Constant.ID_ACTIVO) {
-            throw new BadRequestException(StatusCodes.Code403, MessageCodes.ResponseCodeBR04, "La cuenta del usuario no se encuentra activa.");
+            throw new BadRequestException(MessageCodes.ResponseCodeBR04, "La cuenta del usuario no se encuentra activa.");
         }
         if (usuario.getTipoUsuario() == null || usuario.getTipoUsuario().getId() != Constant.ID_ADMINISTRADOR) {
-            throw new BadRequestException(StatusCodes.Code403, MessageCodes.ResponseCodeBR03, "No tiene permisos de administrador para gestionar catálogos.");
+            throw new BadRequestException(MessageCodes.ResponseCodeBR03, "No tiene permisos de administrador para gestionar catálogos.");
         }
     }
 
