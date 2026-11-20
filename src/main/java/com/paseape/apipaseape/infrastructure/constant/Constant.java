@@ -235,6 +235,7 @@ public class Constant {
 
     // ZONA HORARIA
     public static final String ZONE_ID_LIMA = "America/Lima";
+    public static final int TOLERANCIA_INICIO_PASEO_MINUTOS = 10;
 
     // MOTIVOS NO DISPONIBLE
     public static final String MOTIVO_HORARIO_EXPIRADO = "HORARIO_EXPIRADO";

@@ -1,10 +1,12 @@
 package com.paseape.apipaseape.infrastructure.validator;
 
+import com.paseape.apipaseape.application.repository.IBloqueHorarioRepository;
 import com.paseape.apipaseape.application.repository.IClienteRepository;
 import com.paseape.apipaseape.application.repository.IDistritoLimaRepository;
 import com.paseape.apipaseape.application.repository.IPaseadorRepository;
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoRepository;
 import com.paseape.apipaseape.application.repository.IUsuarioRepository;
+import com.paseape.apipaseape.domain.entity.BloqueHorario;
 import com.paseape.apipaseape.domain.entity.Cliente;
 import com.paseape.apipaseape.domain.entity.DistritoLima;
 import com.paseape.apipaseape.domain.entity.Paseador;
@@ -26,7 +28,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.ObjectUtils;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.HashSet;
 import java.util.List;
@@ -42,16 +47,9 @@ public class SolicitudPaseoValidator {
     private final IPaseadorRepository paseadorRepository;
     private final IClienteRepository clienteRepository;
     private final ISolicitudPaseoRepository solicitudPaseoRepository;
+    private final IBloqueHorarioRepository bloqueHorarioRepository;
 
     private static final Pattern UUID_PATTERN = Pattern.compile(Constant.REGEX_UUID);
-
-    public SolicitudPaseoValidator(IDistritoLimaRepository distritoLimaRepository) {
-        this(distritoLimaRepository, null, null, null, null);
-    }
-
-    public SolicitudPaseoValidator() {
-        this(null, null, null, null, null);
-    }
 
     public ResponseDto<?> validateCrearInmediata(CrearSolicitudInmediataReqDto reqDto) {
         try {
@@ -354,6 +352,66 @@ public class SolicitudPaseoValidator {
     public ResponseDto<?> validateIniciarPaseo(String uuid) {
         try {
             this.validateUuidInternal(uuid, "de la solicitud");
+
+            if (solicitudPaseoRepository != null) {
+                SolicitudPaseo solicitud = solicitudPaseoRepository.findByUuidWithDetails(uuid.trim());
+                if (solicitud == null) {
+                    solicitud = solicitudPaseoRepository.findByUuid(uuid.trim());
+                }
+                if (solicitud == null) {
+                    throw new BadRequestException(MessageCodes.ResponseCodeBR98, "No se encontró la solicitud de paseo.");
+                }
+
+                boolean esAceptada = solicitud.getSolicitudPaseoEstado() != null
+                        && Integer.valueOf(Constant.ID_ESTADO_SOLICITUD_ACEPTADA).equals(solicitud.getSolicitudPaseoEstado().getId());
+                boolean esProgramada = solicitud.getTipoModalidadPaseo() != null
+                        && Integer.valueOf(Constant.ID_MODALIDAD_PROGRAMADO).equals(solicitud.getTipoModalidadPaseo().getId());
+
+                if (esAceptada && esProgramada) {
+                    LocalDate hoyLima = obtenerFechaActualLima();
+                    LocalTime ahoraLima = obtenerHoraActualLima();
+
+                    if (solicitud.getFechaProgramada() == null) {
+                        throw new BadRequestException(MessageCodes.ResponseCodeBR03, "La solicitud programada no tiene una fecha asignada.");
+                    }
+                    if (solicitud.getFechaProgramada().isAfter(hoyLima)) {
+                        throw new BadRequestException(MessageCodes.ResponseCodeBR03,
+                                "Aún no es la fecha programada para iniciar este paseo (" + solicitud.getFechaProgramada() + ").");
+                    }
+                    if (solicitud.getFechaProgramada().isBefore(hoyLima)) {
+                        throw new BadRequestException(MessageCodes.ResponseCodeBR03,
+                                "La fecha programada para este paseo (" + solicitud.getFechaProgramada() + ") ya ha expirado.");
+                    }
+
+                    BloqueHorario bloqueInicial = solicitud.getBloqueHorario();
+                    if (bloqueInicial == null || bloqueInicial.getHoraInicio() == null || bloqueInicial.getHoraFin() == null) {
+                        throw new BadRequestException(MessageCodes.ResponseCodeBR03, "La solicitud programada no tiene un bloque horario válido asignado.");
+                    }
+
+                    LocalTime horaInicioPermitida = bloqueInicial.getHoraInicio().minusMinutes(Constant.TOLERANCIA_INICIO_PASEO_MINUTOS);
+                    LocalTime horaFinPermitida = bloqueInicial.getHoraFin();
+
+                    if (solicitud.getTipoDuracionPaseo() != null
+                            && Integer.valueOf(2).equals(solicitud.getTipoDuracionPaseo().getBloquesRequeridos())) {
+                        BloqueHorario bloqueSiguiente = (bloqueHorarioRepository != null && bloqueInicial.getOrden() != null)
+                                ? bloqueHorarioRepository.findByOrden(bloqueInicial.getOrden() + 1)
+                                : null;
+                        horaFinPermitida = (bloqueSiguiente != null && bloqueSiguiente.getHoraFin() != null)
+                                ? bloqueSiguiente.getHoraFin()
+                                : bloqueInicial.getHoraFin().plusHours(1);
+                    }
+
+                    if (ahoraLima.isBefore(horaInicioPermitida)) {
+                        throw new BadRequestException(MessageCodes.ResponseCodeBR03,
+                                "Aún no es el horario programado para iniciar el paseo. Podrás iniciarlo desde las "
+                                        + horaInicioPermitida + " (tolerancia de " + Constant.TOLERANCIA_INICIO_PASEO_MINUTOS + " minutos antes).");
+                    }
+                    if (ahoraLima.isAfter(horaFinPermitida)) {
+                        throw new BadRequestException(MessageCodes.ResponseCodeBR03,
+                                "El horario programado para iniciar este paseo (" + bloqueInicial.getHoraInicio() + " - " + horaFinPermitida + ") ya ha finalizado.");
+                    }
+                }
+            }
         } catch (BadRequestException brex) {
             return BuildErrorForValidation(
                     brex.statusCode != null ? brex.statusCode : StatusCodes.Code400,
@@ -362,6 +420,14 @@ public class SolicitudPaseoValidator {
             );
         }
         return null;
+    }
+
+    protected LocalDate obtenerFechaActualLima() {
+        return LocalDate.now(ZoneId.of(Constant.ZONE_ID_LIMA));
+    }
+
+    protected LocalTime obtenerHoraActualLima() {
+        return LocalTime.now(ZoneId.of(Constant.ZONE_ID_LIMA));
     }
 
     public ResponseDto<?> validateFinalizarPaseo(String userEmail, String uuid) {
