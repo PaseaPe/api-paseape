@@ -30,6 +30,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -157,6 +158,33 @@ class SolicitudPaseoDetalleServiceTest {
         assertNotNull(result);
         assertNull(result.getPaseador());
         assertTrue(result.getMascotas().isEmpty());
+    }
+
+    @Test
+    @DisplayName("obtenerDetalle - Convierte todas las fechas LocalDateTime de UTC a hora Lima")
+    void testObtenerDetalle_ConvierteFechasALima() throws BadRequestException {
+        String solicitudUuid = UUID.randomUUID().toString();
+        SolicitudPaseo solicitud = SolicitudPaseo.builder()
+                .id(102L)
+                .uuid(solicitudUuid)
+                .horaVencimiento(LocalDateTime.of(2026, 11, 19, 21, 5, 0))
+                .fechaHoraAceptada(LocalDateTime.of(2026, 11, 19, 21, 10, 0))
+                .fechaHoraInicioReal(LocalDateTime.of(2026, 11, 19, 21, 15, 0))
+                .fechaHoraFinReal(LocalDateTime.of(2026, 11, 19, 22, 15, 0))
+                .creadoEl(LocalDateTime.of(2026, 11, 19, 21, 0, 0))
+                .build();
+
+        when(solicitudPaseoRepository.findByUuidWithDetails(solicitudUuid)).thenReturn(solicitud);
+        when(solicitudPaseoMascotaRepository.findAllBySolicitudPaseoIdWithDetails(102L)).thenReturn(List.of());
+
+        SolicitudPaseoDetalleResDto result = service.obtenerDetalle(solicitudUuid);
+
+        assertNotNull(result);
+        assertEquals(LocalDateTime.of(2026, 11, 19, 16, 5, 0), result.getHoraVencimiento());
+        assertEquals(LocalDateTime.of(2026, 11, 19, 16, 10, 0), result.getFechaHoraAceptada());
+        assertEquals(LocalDateTime.of(2026, 11, 19, 16, 15, 0), result.getFechaHoraInicioReal());
+        assertEquals(LocalDateTime.of(2026, 11, 19, 17, 15, 0), result.getFechaHoraFinReal());
+        assertEquals(LocalDateTime.of(2026, 11, 19, 16, 0, 0), result.getCreadoEl());
     }
 
     @Test
