@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - production
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
@@ -39,10 +40,20 @@ jobs:
             exit 1
           }
 
-      - name: Preparar artefacto para despliegue
+      - name: Preparar artefacto y llave OCI (si existe secret)
+        id: prep
+        env:
+          OCI_API_KEY: ${{ secrets.OCI_API_KEY }}
         run: |
           JAR_FILE=$(ls build/libs/*.jar | grep -v 'plain' | head -n 1)
           cp "$JAR_FILE" build/app.jar.deploy
+          if [ -n "$OCI_API_KEY" ]; then
+            printf '%s\n' "$OCI_API_KEY" > build/oci_api_key.pem
+            chmod 600 build/oci_api_key.pem
+            echo "has_oci_key=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_oci_key=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Transferir JAR a OCI via SCP
         uses: appleboy/scp-action@v0.1.7
@@ -51,6 +62,17 @@ jobs:
           username: ${{ secrets.OCI_USERNAME }}
           key: ${{ secrets.OCI_SSH_KEY }}
           source: "build/app.jar.deploy"
+          target: "/home/ubuntu/paseape"
+          strip_components: 1
+
+      - name: Transferir llave OCI via SCP (si existe secret)
+        if: steps.prep.outputs.has_oci_key == 'true'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USERNAME }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          source: "build/oci_api_key.pem"
           target: "/home/ubuntu/paseape"
           strip_components: 1
 
@@ -76,10 +98,15 @@ jobs:
             echo "=== 3. Purgando archivos JAR anteriores ==="
             find . -maxdepth 1 -name "*.jar*" ! -name "app.jar.deploy" -type f -exec rm -vf {} +
 
-            echo "=== 4. Asignando el nuevo binario a app.jar ==="
+            echo "=== 4. Asignando el nuevo binario y validando llave OCI ==="
             mv -f app.jar.deploy app.jar
             chmod 644 app.jar
-            ls -lh app.jar
+            if [ ! -f oci_api_key.pem ]; then
+              echo "ERROR CRITICO: oci_api_key.pem no existe en /home/ubuntu/paseape."
+              exit 1
+            fi
+            chmod 644 oci_api_key.pem
+            ls -lh app.jar oci_api_key.pem
 
             echo "=== 5. Sincronizando variables en .env remoto ==="
             if [ -f .env ]; then
