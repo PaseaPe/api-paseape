@@ -38,6 +38,7 @@ import com.paseape.apipaseape.infrastructure.constant.Constant;
 import com.paseape.apipaseape.infrastructure.constant.MessageCodes;
 import com.paseape.apipaseape.infrastructure.dto.request.CrearSolicitudInmediataReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.CrearSolicitudProgramadaReqDto;
+import com.paseape.apipaseape.infrastructure.dto.response.PageResponseDto;
 import com.paseape.apipaseape.infrastructure.dto.response.SolicitudPaseoResDto;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
 import com.paseape.apipaseape.infrastructure.mapper.dto.ISolicitudPaseoDtoMapper;
@@ -1156,5 +1157,90 @@ class SolicitudPaseoServiceTest {
         assertEquals(MessageCodes.ResponseCodeBR03, ex.code);
         assertEquals(Constant.MSJ_ERROR_SOLICITUD_NO_FINALIZABLE, ex.getMessage());
         verify(solicitudPaseoRecorridoRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("obtenerBandejaCliente - Convierte creadoEl y horaVencimiento de UTC a Lima y mantiene fechaProgramada")
+    void testObtenerBandejaCliente_ConvierteUtcALima() throws BadRequestException {
+        LocalDateTime creadoElUtc = LocalDateTime.of(2026, 11, 24, 2, 30, 0);
+        LocalDateTime horaVencimientoUtc = LocalDateTime.of(2026, 11, 24, 2, 35, 0);
+        LocalDate fechaProgramada = LocalDate.of(2026, 11, 25);
+
+        SolicitudPaseo solicitud = SolicitudPaseo.builder()
+                .id(200L)
+                .uuid(UUID.randomUUID().toString())
+                .codigoReserva("PAS-INM-202611-0001")
+                .cliente(cliente)
+                .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_BUSCANDO))
+                .fechaProgramada(fechaProgramada)
+                .creadoEl(creadoElUtc)
+                .horaVencimiento(horaVencimientoUtc)
+                .build();
+
+        org.springframework.data.domain.Page<SolicitudPaseo> pageResult =
+                new org.springframework.data.domain.PageImpl<>(List.of(solicitud));
+
+        when(usuarioRepository.findByCorreo("cliente@paseape.com")).thenReturn(clienteUsuario);
+        when(clienteRepository.findByUsuarioId(10L)).thenReturn(cliente);
+        when(solicitudPaseoRepository.findByClienteIdAndEstadosPaginado(
+                eq(1L),
+                anyList(),
+                any(org.springframework.data.domain.Pageable.class)
+        )).thenReturn(pageResult);
+        when(solicitudPaseoMascotaRepository.findAllBySolicitudPaseoIdInWithDetails(List.of(200L)))
+                .thenReturn(List.of());
+
+        PageResponseDto<SolicitudPaseoResDto> result =
+                service.obtenerBandejaCliente("cliente@paseape.com", Constant.TAB_CLIENTE_PENDIENTES, 0, 10);
+
+        assertNotNull(result);
+        assertEquals(1, result.getItems().size());
+        SolicitudPaseoResDto dto = result.getItems().get(0);
+        assertEquals(LocalDateTime.of(2026, 11, 23, 21, 30, 0), dto.getCreadoEl());
+        assertEquals(LocalDateTime.of(2026, 11, 23, 21, 35, 0), dto.getHoraVencimiento());
+        assertEquals(fechaProgramada, dto.getFechaProgramada());
+    }
+
+    @Test
+    @DisplayName("obtenerBandejaPaseador - Convierte creadoEl y horaVencimiento de UTC a Lima y mantiene fechaProgramada")
+    void testObtenerBandejaPaseador_ConvierteUtcALima() throws BadRequestException {
+        LocalDateTime creadoElUtc = LocalDateTime.of(2026, 11, 24, 2, 30, 0);
+        LocalDateTime horaVencimientoUtc = LocalDateTime.of(2026, 11, 24, 2, 35, 0);
+        LocalDate fechaProgramada = LocalDate.of(2026, 11, 25);
+
+        SolicitudPaseo solicitud = SolicitudPaseo.builder()
+                .id(201L)
+                .uuid(UUID.randomUUID().toString())
+                .codigoReserva("PAS-INM-202611-0002")
+                .cliente(cliente)
+                .paseador(paseador)
+                .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_ACEPTADA))
+                .fechaProgramada(fechaProgramada)
+                .creadoEl(creadoElUtc)
+                .horaVencimiento(horaVencimientoUtc)
+                .build();
+
+        org.springframework.data.domain.Page<SolicitudPaseo> pageResult =
+                new org.springframework.data.domain.PageImpl<>(List.of(solicitud));
+
+        when(usuarioRepository.findByCorreo("paseador@paseape.com")).thenReturn(paseadorUsuario);
+        when(paseadorRepository.findByUsuarioId(20L)).thenReturn(paseador);
+        when(solicitudPaseoRepository.findByPaseadorIdAndEstadosPaginado(
+                eq(2L),
+                anyList(),
+                any(org.springframework.data.domain.Pageable.class)
+        )).thenReturn(pageResult);
+        when(solicitudPaseoMascotaRepository.findAllBySolicitudPaseoIdInWithDetails(List.of(201L)))
+                .thenReturn(List.of());
+
+        PageResponseDto<SolicitudPaseoResDto> result =
+                service.obtenerBandejaPaseador("paseador@paseape.com", Constant.TAB_MIS_PASEOS, 0, 10);
+
+        assertNotNull(result);
+        assertEquals(1, result.getItems().size());
+        SolicitudPaseoResDto dto = result.getItems().get(0);
+        assertEquals(LocalDateTime.of(2026, 11, 23, 21, 30, 0), dto.getCreadoEl());
+        assertEquals(LocalDateTime.of(2026, 11, 23, 21, 35, 0), dto.getHoraVencimiento());
+        assertEquals(fechaProgramada, dto.getFechaProgramada());
     }
 }

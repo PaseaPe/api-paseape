@@ -1,15 +1,19 @@
 package com.paseape.apipaseape.infrastructure.validator;
 
+import com.paseape.apipaseape.application.repository.IBloqueHorarioRepository;
 import com.paseape.apipaseape.application.repository.IClienteRepository;
 import com.paseape.apipaseape.application.repository.IDistritoLimaRepository;
 import com.paseape.apipaseape.application.repository.IPaseadorRepository;
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoRepository;
 import com.paseape.apipaseape.application.repository.IUsuarioRepository;
+import com.paseape.apipaseape.domain.entity.BloqueHorario;
 import com.paseape.apipaseape.domain.entity.Cliente;
 import com.paseape.apipaseape.domain.entity.DistritoLima;
 import com.paseape.apipaseape.domain.entity.Paseador;
 import com.paseape.apipaseape.domain.entity.SolicitudPaseo;
 import com.paseape.apipaseape.domain.entity.SolicitudPaseoEstado;
+import com.paseape.apipaseape.domain.entity.TipoDuracionPaseo;
+import com.paseape.apipaseape.domain.entity.TipoModalidadPaseo;
 import com.paseape.apipaseape.domain.entity.Usuario;
 import com.paseape.apipaseape.infrastructure.constant.Constant;
 import com.paseape.apipaseape.infrastructure.constant.MessageCodes;
@@ -27,7 +31,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
@@ -48,6 +54,8 @@ class SolicitudPaseoValidatorTest {
     private IClienteRepository clienteRepository;
     @Mock
     private ISolicitudPaseoRepository solicitudPaseoRepository;
+    @Mock
+    private IBloqueHorarioRepository bloqueHorarioRepository;
 
     private SolicitudPaseoValidator validator;
 
@@ -58,8 +66,30 @@ class SolicitudPaseoValidatorTest {
                 usuarioRepository,
                 paseadorRepository,
                 clienteRepository,
-                solicitudPaseoRepository
+                solicitudPaseoRepository,
+                bloqueHorarioRepository
         );
+    }
+
+    private SolicitudPaseoValidator crearValidatorConFechaHora(LocalDate fechaActual, LocalTime horaActual) {
+        return new SolicitudPaseoValidator(
+                distritoLimaRepository,
+                usuarioRepository,
+                paseadorRepository,
+                clienteRepository,
+                solicitudPaseoRepository,
+                bloqueHorarioRepository
+        ) {
+            @Override
+            protected LocalDate obtenerFechaActualLima() {
+                return fechaActual;
+            }
+
+            @Override
+            protected LocalTime obtenerHoraActualLima() {
+                return horaActual;
+            }
+        };
     }
 
     @Test
@@ -397,5 +427,143 @@ class SolicitudPaseoValidatorTest {
                         .build()
         );
         assertNull(validator.validateFinalizarPaseo(email, validUuid));
+    }
+
+    @Test
+    @DisplayName("validateIniciarPaseo - Falla si el uuid es inválido o la solicitud no existe")
+    void testValidateIniciarPaseo_UuidInvalidoONoExiste() {
+        assertNotNull(validator.validateIniciarPaseo(null));
+        assertNotNull(validator.validateIniciarPaseo("uuid-invalido"));
+
+        String uuid = UUID.randomUUID().toString();
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(null);
+        when(solicitudPaseoRepository.findByUuid(uuid)).thenReturn(null);
+
+        ResponseDto<?> errNotFound = validator.validateIniciarPaseo(uuid);
+        assertNotNull(errNotFound);
+        assertEquals(MessageCodes.ResponseCodeBR98, errNotFound.getCode());
+    }
+
+    @Test
+    @DisplayName("validateIniciarPaseo - Solicitud inmediata pasa sin validar fecha ni rango horario")
+    void testValidateIniciarPaseo_InmediataSinValidacionHoraria() {
+        String uuid = UUID.randomUUID().toString();
+        SolicitudPaseoValidator customValidator = crearValidatorConFechaHora(LocalDate.of(2026, 11, 19), LocalTime.of(23, 30));
+
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(
+                SolicitudPaseo.builder()
+                        .id(100L)
+                        .tipoModalidadPaseo(new TipoModalidadPaseo(Constant.ID_MODALIDAD_INMEDIATO))
+                        .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_ACEPTADA))
+                        .fechaProgramada(LocalDate.of(2026, 11, 10))
+                        .bloqueHorario(null)
+                        .build()
+        );
+
+        assertNull(customValidator.validateIniciarPaseo(uuid));
+    }
+
+    @Test
+    @DisplayName("validateIniciarPaseo - Solicitud programada falla si la fecha es futura o pasada")
+    void testValidateIniciarPaseo_ProgramadaFechaIncorrecta() {
+        String uuid = UUID.randomUUID().toString();
+        LocalDate hoy = LocalDate.of(2026, 11, 19);
+        SolicitudPaseoValidator customValidator = crearValidatorConFechaHora(hoy, LocalTime.of(10, 15));
+        BloqueHorario bloque = BloqueHorario.builder()
+                .id(5).orden(5).horaInicio(LocalTime.of(10, 0)).horaFin(LocalTime.of(11, 0)).build();
+
+        // Fecha futura
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(
+                SolicitudPaseo.builder()
+                        .id(101L)
+                        .tipoModalidadPaseo(new TipoModalidadPaseo(Constant.ID_MODALIDAD_PROGRAMADO))
+                        .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_ACEPTADA))
+                        .fechaProgramada(hoy.plusDays(1))
+                        .bloqueHorario(bloque)
+                        .build()
+        );
+        ResponseDto<?> errFutura = customValidator.validateIniciarPaseo(uuid);
+        assertNotNull(errFutura);
+        assertEquals(MessageCodes.ResponseCodeBR03, errFutura.getCode());
+        assertTrue(errFutura.getMessage().contains("fecha programada"));
+
+        // Fecha pasada
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(
+                SolicitudPaseo.builder()
+                        .id(101L)
+                        .tipoModalidadPaseo(new TipoModalidadPaseo(Constant.ID_MODALIDAD_PROGRAMADO))
+                        .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_ACEPTADA))
+                        .fechaProgramada(hoy.minusDays(1))
+                        .bloqueHorario(bloque)
+                        .build()
+        );
+        ResponseDto<?> errPasada = customValidator.validateIniciarPaseo(uuid);
+        assertNotNull(errPasada);
+        assertEquals(MessageCodes.ResponseCodeBR03, errPasada.getCode());
+        assertTrue(errPasada.getMessage().contains("expirado"));
+    }
+
+    @Test
+    @DisplayName("validateIniciarPaseo - Solicitud programada de 1 bloque valida tolerancia de 10 min y límite superior")
+    void testValidateIniciarPaseo_ProgramadaUnBloque() {
+        String uuid = UUID.randomUUID().toString();
+        LocalDate hoy = LocalDate.of(2026, 11, 19);
+        BloqueHorario bloque = BloqueHorario.builder()
+                .id(5).orden(5).horaInicio(LocalTime.of(10, 0)).horaFin(LocalTime.of(11, 0)).build();
+        SolicitudPaseo solicitud = SolicitudPaseo.builder()
+                .id(102L)
+                .tipoModalidadPaseo(new TipoModalidadPaseo(Constant.ID_MODALIDAD_PROGRAMADO))
+                .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_ACEPTADA))
+                .fechaProgramada(hoy)
+                .bloqueHorario(bloque)
+                .tipoDuracionPaseo(TipoDuracionPaseo.builder().id(2).bloquesRequeridos(1).minutos(60).build())
+                .build();
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(solicitud);
+
+        // 09:49 -> Antes de la tolerancia (10 min)
+        ResponseDto<?> errAntes = crearValidatorConFechaHora(hoy, LocalTime.of(9, 49)).validateIniciarPaseo(uuid);
+        assertNotNull(errAntes);
+        assertEquals(MessageCodes.ResponseCodeBR03, errAntes.getCode());
+
+        // 09:50 -> Justo en el límite de tolerancia
+        assertNull(crearValidatorConFechaHora(hoy, LocalTime.of(9, 50)).validateIniciarPaseo(uuid));
+
+        // 10:30 -> Dentro del bloque
+        assertNull(crearValidatorConFechaHora(hoy, LocalTime.of(10, 30)).validateIniciarPaseo(uuid));
+
+        // 11:01 -> Después del fin del bloque
+        ResponseDto<?> errDespues = crearValidatorConFechaHora(hoy, LocalTime.of(11, 1)).validateIniciarPaseo(uuid);
+        assertNotNull(errDespues);
+        assertEquals(MessageCodes.ResponseCodeBR03, errDespues.getCode());
+    }
+
+    @Test
+    @DisplayName("validateIniciarPaseo - Solicitud programada de 2 bloques permite iniciar hasta el fin del segundo bloque")
+    void testValidateIniciarPaseo_ProgramadaDosBloques() {
+        String uuid = UUID.randomUUID().toString();
+        LocalDate hoy = LocalDate.of(2026, 11, 19);
+        BloqueHorario bloque1 = BloqueHorario.builder()
+                .id(5).orden(5).horaInicio(LocalTime.of(10, 0)).horaFin(LocalTime.of(11, 0)).build();
+        BloqueHorario bloque2 = BloqueHorario.builder()
+                .id(6).orden(6).horaInicio(LocalTime.of(11, 0)).horaFin(LocalTime.of(12, 0)).build();
+
+        SolicitudPaseo solicitud = SolicitudPaseo.builder()
+                .id(103L)
+                .tipoModalidadPaseo(new TipoModalidadPaseo(Constant.ID_MODALIDAD_PROGRAMADO))
+                .solicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_ACEPTADA))
+                .fechaProgramada(hoy)
+                .bloqueHorario(bloque1)
+                .tipoDuracionPaseo(TipoDuracionPaseo.builder().id(3).bloquesRequeridos(2).minutos(90).build())
+                .build();
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(solicitud);
+        when(bloqueHorarioRepository.findByOrden(6)).thenReturn(bloque2);
+
+        // 11:45 -> Dentro del segundo bloque
+        assertNull(crearValidatorConFechaHora(hoy, LocalTime.of(11, 45)).validateIniciarPaseo(uuid));
+
+        // 12:01 -> Después del fin del segundo bloque
+        ResponseDto<?> errDespues = crearValidatorConFechaHora(hoy, LocalTime.of(12, 1)).validateIniciarPaseo(uuid);
+        assertNotNull(errDespues);
+        assertEquals(MessageCodes.ResponseCodeBR03, errDespues.getCode());
     }
 }

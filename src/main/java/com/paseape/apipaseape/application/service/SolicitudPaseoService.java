@@ -27,6 +27,7 @@ import com.paseape.apipaseape.infrastructure.dto.request.UbicacionPuntoReqDto;
 import com.paseape.apipaseape.infrastructure.dto.response.BatchIngestaResDto;
 import com.paseape.apipaseape.infrastructure.util.GeoDistanceCalculator;
 import com.paseape.apipaseape.infrastructure.util.PolylineDeltaEncoder;
+import com.paseape.apipaseape.infrastructure.util.UtilMethods;
 
 import java.time.ZoneOffset;
 
@@ -642,10 +643,7 @@ public class SolicitudPaseoService {
                 .collect(Collectors.groupingBy(spm -> spm.getSolicitudPaseo().getId()));
 
         List<SolicitudPaseoResDto> dtoList = content.stream()
-                .map(s -> {
-                    List<SolicitudPaseoMascota> mascotas = mascotasPorSolicitud.getOrDefault(s.getId(), List.of());
-                    return solicitudPaseoDtoMapper.toResDto(s, mascotas);
-                })
+                .map(s -> toResDtoConHoraLima(s, mascotasPorSolicitud.getOrDefault(s.getId(), List.of())))
                 .toList();
 
         return PageResponseDto.<SolicitudPaseoResDto>builder()
@@ -1147,10 +1145,7 @@ public class SolicitudPaseoService {
                 .collect(Collectors.groupingBy(spm -> spm.getSolicitudPaseo().getId()));
 
         List<SolicitudPaseoResDto> dtoList = content.stream()
-                .map(s -> {
-                    List<SolicitudPaseoMascota> mascotas = mascotasPorSolicitud.getOrDefault(s.getId(), List.of());
-                    return solicitudPaseoDtoMapper.toResDto(s, mascotas);
-                })
+                .map(s -> toResDtoConHoraLima(s, mascotasPorSolicitud.getOrDefault(s.getId(), List.of())))
                 .toList();
 
         return PageResponseDto.<SolicitudPaseoResDto>builder()
@@ -1393,5 +1388,12 @@ public class SolicitudPaseoService {
             throw new BadRequestException(MessageCodes.ResponseCodeBR98, "No se encontró el recorrido histórico consolidado para este paseo.");
         }
         return solicitudPaseoRecorridoDtoMapper.toResDto(recorrido);
+    }
+
+    private SolicitudPaseoResDto toResDtoConHoraLima(SolicitudPaseo solicitud, List<SolicitudPaseoMascota> mascotas) {
+        SolicitudPaseoResDto dto = solicitudPaseoDtoMapper.toResDto(solicitud, mascotas);
+        dto.setHoraVencimiento(UtilMethods.convertirUtcALima(dto.getHoraVencimiento()));
+        dto.setCreadoEl(UtilMethods.convertirUtcALima(dto.getCreadoEl()));
+        return dto;
     }
 }
