@@ -83,8 +83,9 @@ public class MascotaEntity extends Auditable {
     @Column(name = "precauciones_medicas", columnDefinition = "TEXT")
     private String precaucionesMedicas;
 
-    @Column(name = "foto_url")
-    private String fotoUrl;
+    @ManyToOne
+    @JoinColumn(name = "folder_digital_document_id")
+    private FolderDigitalDocumentEntity folderDigitalDocument;
 
     @Column(name = "estado", nullable = false)
     private Integer estado;

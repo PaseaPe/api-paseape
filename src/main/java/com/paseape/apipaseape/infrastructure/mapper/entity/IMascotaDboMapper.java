@@ -15,7 +15,8 @@ import java.util.List;
                 ITipoRazaDboMapper.class,
                 ITipoGeneroMascotaDboMapper.class,
                 ITipoTamanoMascotaDboMapper.class,
-                ITipoNivelEnergiaDboMapper.class
+                ITipoNivelEnergiaDboMapper.class,
+                IDigitalDocumentDboMapper.class
         }
 )
 public interface IMascotaDboMapper {

@@ -5,6 +5,7 @@ import com.paseape.apipaseape.application.repository.IDisponibilidadPaseadorRepo
 import com.paseape.apipaseape.application.repository.IPaseadorRepository;
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoMascotaRepository;
 import com.paseape.apipaseape.application.repository.IUsuarioRepository;
+import com.paseape.apipaseape.domain.entity.*;
 import com.paseape.apipaseape.domain.entity.BloqueHorario;
 import com.paseape.apipaseape.domain.entity.DiaSemana;
 import com.paseape.apipaseape.domain.entity.DisponibilidadPaseador;
@@ -14,12 +15,14 @@ import com.paseape.apipaseape.domain.entity.SolicitudPaseoMascota;
 import com.paseape.apipaseape.domain.entity.Usuario;
 import com.paseape.apipaseape.infrastructure.constant.Constant;
 import com.paseape.apipaseape.infrastructure.dto.request.CambiarDistritoCoberturaReqDto;
+import com.paseape.apipaseape.infrastructure.dto.response.*;
 import com.paseape.apipaseape.infrastructure.dto.response.DisponibilidadBloqueFechaResDto;
 import com.paseape.apipaseape.infrastructure.dto.response.DisponibilidadPaseadorFechaResDto;
 import com.paseape.apipaseape.infrastructure.dto.response.MascotaResDto;
 import com.paseape.apipaseape.infrastructure.dto.response.PaseadorResDto;
 import com.paseape.apipaseape.infrastructure.dto.response.UsuarioResDto;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
+import com.paseape.apipaseape.infrastructure.mapper.dto.IDigitalDocumentDtoMapper;
 import com.paseape.apipaseape.infrastructure.mapper.dto.IMascotaDtoMapper;
 import com.paseape.apipaseape.infrastructure.mapper.dto.IPaseadorDtoMapper;
 import com.paseape.apipaseape.infrastructure.mapper.dto.IUsuarioDtoMapper;
@@ -27,7 +30,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.security.Principal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -43,12 +48,15 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class PaseadorService {
 
+    private final DigitalDocumentService digitalDocumentService;
+
     private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
 
     private final IPaseadorRepository paseadorRepository;
     private final IUsuarioRepository usuarioRepository;
     private final IPaseadorDtoMapper paseadorDtoMapper;
     private final IUsuarioDtoMapper usuarioDtoMapper;
+    private final IDigitalDocumentDtoMapper digitalDocumentDtoMapper;
     private final IDisponibilidadPaseadorRepository disponibilidadRepository;
     private final ISolicitudPaseoMascotaRepository solicitudPaseoMascotaRepository;
     private final IDiaSemanaRepository diaSemanaRepository;
@@ -99,7 +107,13 @@ public class PaseadorService {
         if (usuario == null) {
             throw new BadRequestException("No se encontró el usuario del paseador.");
         }
-        return usuarioDtoMapper.toResDto(usuario, null, paseador, null, paseadorDtoMapper);
+        FolderDigitalDocument folder = usuario.getFolderDigitalDocument() != null ? usuario.getFolderDigitalDocument() : null;
+        UsuarioResDto usuarioResDto = usuarioDtoMapper.toResDto(usuario, null, paseador, null, paseadorDtoMapper);
+        usuarioResDto.setFotoPerfilUrl(digitalDocumentService.urlFotoPerfil(usuario));
+        if (folder != null) {
+            usuarioResDto.setDigitalDocuments(digitalDocumentDtoMapper.toResDtoList(digitalDocumentService.documentList(usuario.getFolderDigitalDocument().getId())));
+        }
+        return usuarioResDto;
     }
 
     @Transactional(readOnly = true)
@@ -292,5 +306,11 @@ public class PaseadorService {
             return Constant.MOTIVO_SIN_CUPOS;
         }
         return null;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public DocumentUrlResDto subirFotoPaseador(Principal principal, MultipartFile file) throws BadRequestException{
+        Usuario usuario = usuarioRepository.findByCorreo(principal.getName());
+        return digitalDocumentService.subirFotoUsuario(usuario, file);
     }
 }

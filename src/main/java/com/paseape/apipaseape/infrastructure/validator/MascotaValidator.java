@@ -1,8 +1,16 @@
 package com.paseape.apipaseape.infrastructure.validator;
 
+import java.math.BigDecimal;
+import java.security.Principal;
+
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
+import com.paseape.apipaseape.application.repository.IClienteRepository;
+import com.paseape.apipaseape.application.repository.IUsuarioRepository;
+import com.paseape.apipaseape.domain.entity.Cliente;
+import com.paseape.apipaseape.domain.entity.Usuario;
 import com.paseape.apipaseape.infrastructure.constant.MessageCodes;
 import com.paseape.apipaseape.infrastructure.constant.StatusCodes;
 import com.paseape.apipaseape.infrastructure.dto.request.ActualizarMascotaReqDto;
@@ -10,10 +18,42 @@ import com.paseape.apipaseape.infrastructure.dto.request.MascotaReqDto;
 import com.paseape.apipaseape.infrastructure.dto.request.RegistrarMascotaReqDto;
 import com.paseape.apipaseape.infrastructure.dto.response.ErrorDetailDto;
 
-import java.math.BigDecimal;
+import lombok.RequiredArgsConstructor;
 
 @Component
+@RequiredArgsConstructor
 public class MascotaValidator {
+
+    private final IUsuarioRepository usuarioRepository;
+    private final IClienteRepository clienteRepository;
+    private final StorageValidator storageValidator;
+
+    public ErrorDetailDto validateSubirFotoMascota(Principal principal, String mascotaUuid, MultipartFile file) {
+        if (principal == null || !StringUtils.hasText(principal.getName())) {
+            return buildError(StatusCodes.Code401, MessageCodes.ResponseCodeE01, "No se encontro una sesion activa autenticada");
+        }
+
+        if (!StringUtils.hasText(mascotaUuid)) {
+            return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El identificador de la mascota es obligatorio.");
+        }
+
+        Usuario usuario = usuarioRepository.findByCorreo(principal.getName());
+        if (usuario == null) {
+            return buildError(StatusCodes.Code404, MessageCodes.ResponseCodeBR98, "Usuario no encontrado");
+        }
+
+        Cliente cliente = clienteRepository.findByUsuarioId(usuario.getId());
+        if (cliente == null) {
+            return buildError(StatusCodes.Code403, MessageCodes.ResponseCodeBR04, "El usuario no posee un perfil de cliente");
+        }
+
+        ErrorDetailDto fileError = storageValidator.validateUpload(file);
+        if (fileError != null) {
+            return fileError;
+        }
+
+        return null;
+    }
 
     public ErrorDetailDto validateRegistroUnitario(RegistrarMascotaReqDto request) {
         if (request == null) {
@@ -61,7 +101,6 @@ public class MascotaValidator {
             return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El cuerpo de la solicitud no puede estar vacío.");
         }
 
-        // Validar campos solo si se envían (patch semantics)
         if (StringUtils.hasText(mascota.getNombre()) && mascota.getNombre().trim().length() > 60) {
             return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El nombre de la mascota no debe superar 60 caracteres.");
         }
@@ -90,8 +129,6 @@ public class MascotaValidator {
             return buildError(StatusCodes.Code400, MessageCodes.ResponseCodeBR01, "El campo sociable_con_personas debe ser 0 o 1.");
         }
 
-        // Validación cruzada: si se envían tanto tipoMascotaId como tipoRazaId, verificar compatibilidad
-        // Nota: La validación real de FK se hace en BD, pero se puede agregar validación de negocio aquí si se requiere
         return null;
     }
 

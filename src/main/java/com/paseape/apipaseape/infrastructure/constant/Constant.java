@@ -235,6 +235,7 @@ public class Constant {
 
     // ZONA HORARIA
     public static final String ZONE_ID_LIMA = "America/Lima";
+    public static final int TOLERANCIA_INICIO_PASEO_MINUTOS = 10;
 
     // MOTIVOS NO DISPONIBLE
     public static final String MOTIVO_HORARIO_EXPIRADO = "HORARIO_EXPIRADO";
@@ -264,16 +265,20 @@ public class Constant {
     public static final String MSJ_SOLICITUD_RECHAZADA_EXITO = "Solicitud de paseo rechazada exitosamente";
     public static final String MSJ_SOLICITUD_CANCELADA_EXITO = "Paseo cancelado exitosamente";
     public static final String MSJ_PASEO_INICIADO_EXITO = "Paseo iniciado exitosamente";
+    public static final String MSJ_PASEO_FINALIZADO_EXITO = "Paseo finalizado exitosamente";
     public static final String MSJ_ERROR_SOLICITUD_NO_PENDIENTE = "La solicitud no se encuentra en estado pendiente de aprobación.";
     public static final String MSJ_ERROR_SOLICITUD_NO_CANCELABLE = "Solo se pueden cancelar paseos que se encuentren en estado aceptado y no hayan iniciado.";
     public static final String MSJ_ERROR_SOLICITUD_NO_INICIABLE = "Solo se puede iniciar un paseo que se encuentre en estado ACEPTADA.";
+    public static final String MSJ_ERROR_SOLICITUD_NO_FINALIZABLE = "Solo se puede finalizar un paseo que se encuentre en curso.";
     public static final String MSJ_ERROR_PASEO_YA_EN_CURSO = "El paseo ya se encuentra en curso.";
+    public static final String MSJ_ERROR_PASEO_YA_FINALIZADO = "El paseo ya se encuentra finalizado.";
     public static final String MSJ_ERROR_MOTIVO_CANCELACION_OBLIGATORIO = "El motivo de cancelación es obligatorio y debe tener al menos 10 caracteres.";
 
     public static final String TITULO_NOTIF_SOLICITUD_PROGRAMADA_ACEPTADA = "¡Tu paseo programado ha sido confirmado!";
     public static final String TITULO_NOTIF_SOLICITUD_PROGRAMADA_RECHAZADA = "Actualización de tu solicitud de paseo programado";
     public static final String TITULO_NOTIF_SOLICITUD_CANCELADA_PASEADOR = "Paseo cancelado por el paseador";
     public static final String TITULO_NOTIF_PASEO_INICIADO = "¡Tu paseo ha comenzado!";
+    public static final String TITULO_NOTIF_PASEO_FINALIZADO = "¡Tu paseo ha finalizado!";
     public static final String MOTIVO_RECHAZO_DEFAULT = "Solicitud declinada por el paseador";
 
     // =========================================================================
@@ -288,4 +293,38 @@ public class Constant {
     public static final String MSJ_SOLICITUD_CANCELADA_CLIENTE_EXITO = "Paseo cancelado exitosamente por el cliente";
     public static final String MSJ_ERROR_SOLICITUD_EN_CURSO_NO_CANCELABLE = "No se puede cancelar un paseo que ya se encuentra en curso.";
     public static final String TITULO_NOTIF_SOLICITUD_CANCELADA_CLIENTE = "Paseo cancelado por el cliente";
+
+    // DIGITAL DOCUMENT TYPE
+    public static final int ID_DOC_FOTO_PERFIL = 1;
+    public static final int ID_DOC_FOTO_MASCOTA = 2;
+    public static final int ID_DOC_ANTECEDENTE_POLICIAL = 3;
+    public static final int ID_DOC_DOCUMENTO_IDENTIDAD = 4;
+
+    public static final int STORAGE_PAR_EXPIRATION_MINUTES = 30;
+
+    public static final String MSG_DESCARGA_FOTO_EXITOSA = "URL de documento generado exitosamente.";
+    public static final String MSG_SUBIDA_ANTECEDENTES_EXITOSA = "Antecedentes policiales subidos exitosamente.";
+    public static final String MSG_ELIMINAR_DOCUMENTO_EXITOSO = "Documento digital eliminado exitosamente.";
+
+    // =========================================================================
+    // TIPO ORIGEN TRAZA (SPRINT 3)
+    // =========================================================================
+    public static final int ID_ORIGEN_TRAZA_GPS_TIEMPO_REAL = 1;
+    public static final int ID_ORIGEN_TRAZA_RUTA_INTERPOLADA = 2;
+    public static final int ID_ORIGEN_TRAZA_CIERRE_ADMINISTRATIVO = 3;
+
+    public static final String ORIGEN_TRAZA_GPS_TIEMPO_REAL = "GPS_TIEMPO_REAL";
+    public static final String ORIGEN_TRAZA_RUTA_INTERPOLADA = "RUTA_INTERPOLADA";
+    public static final String ORIGEN_TRAZA_CIERRE_ADMINISTRATIVO = "CIERRE_ADMINISTRATIVO";
+
+    // =========================================================================
+    // TELEMETRÍA Y SEGUIMIENTO GPS (SPRINT 3 - HU26, HU24)
+    // =========================================================================
+    public static final String MSJ_PUNTOS_TELEMETRIA_PROCESADOS = "Puntos de telemetría procesados y acumulados correctamente";
+    public static final String MSJ_UBICACION_EN_VIVO_OBTENIDA = "Ubicación en tiempo real obtenida correctamente";
+    public static final String MSJ_ESPERA_PRIMERA_SENAL_GPS = "A la espera de la primera señal GPS del paseador";
+    public static final String MSJ_RECORRIDO_CONSOLIDADO_EXITO = "El paseo ha finalizado y el recorrido ha sido consolidado";
+    public static final String MSJ_RECORRIDO_OBTENIDO_EXITO = "Recorrido histórico del paseo obtenido exitosamente";
+    public static final String MSJ_SOLICITUD_DETALLE_OBTENIDO = "Detalle de la solicitud de paseo obtenido exitosamente";
+    public static final String MSJ_ERROR_PASEO_NO_ACTIVO_GPS = "No se puede registrar telemetría porque el paseo no se encuentra en curso.";
 }
