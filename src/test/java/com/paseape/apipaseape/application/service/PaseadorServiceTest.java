@@ -18,6 +18,7 @@ import com.paseape.apipaseape.infrastructure.dto.response.DisponibilidadPaseador
 import com.paseape.apipaseape.infrastructure.dto.response.MascotaResDto;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
 import com.paseape.apipaseape.infrastructure.mapper.dto.IMascotaDtoMapper;
+import com.paseape.apipaseape.infrastructure.mapper.dto.IDigitalDocumentDtoMapper;
 import com.paseape.apipaseape.infrastructure.mapper.dto.IPaseadorDtoMapper;
 import com.paseape.apipaseape.infrastructure.mapper.dto.IUsuarioDtoMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,13 +63,19 @@ class PaseadorServiceTest {
 
     private Paseador paseadorAprobado;
 
+    private DigitalDocumentService digitalDocumentService;
+
+    private IDigitalDocumentDtoMapper digitalDocumentDtoMapper;
+
     @BeforeEach
     void setUp() {
         service = new PaseadorService(
+                digitalDocumentService,
                 paseadorRepository,
                 usuarioRepository,
                 paseadorDtoMapper,
                 usuarioDtoMapper,
+                digitalDocumentDtoMapper,
                 disponibilidadRepository,
                 solicitudPaseoMascotaRepository,
                 diaSemanaRepository,

@@ -37,8 +37,10 @@ public interface ISolicitudPaseoJpaRepository extends JpaRepository<SolicitudPas
             "JOIN FETCH s.solicitudPaseoEstado " +
             "JOIN FETCH s.cliente c " +
             "JOIN FETCH c.usuario " +
+            "LEFT JOIN FETCH s.bloqueHorario " +
             "LEFT JOIN FETCH s.paseador p " +
             "LEFT JOIN FETCH p.usuario " +
+            "LEFT JOIN FETCH p.distritoCobertura " +
             "WHERE s.uuid = :uuid")
     SolicitudPaseoEntity findByUuidWithDetails(@Param("uuid") String uuid);
 

@@ -1,12 +1,16 @@
 package com.paseape.apipaseape.application.service;
 
 import com.paseape.apipaseape.application.repository.IClienteRepository;
+import com.paseape.apipaseape.application.repository.IDigitalDocumentRepository;
 import com.paseape.apipaseape.application.repository.IMascotaRepository;
 import com.paseape.apipaseape.application.repository.IUsuarioRepository;
 import com.paseape.apipaseape.domain.entity.Cliente;
+import com.paseape.apipaseape.domain.entity.DigitalDocument;
 import com.paseape.apipaseape.domain.entity.Mascota;
 import com.paseape.apipaseape.domain.entity.Usuario;
 import com.paseape.apipaseape.infrastructure.dto.response.ClienteResDto;
+import com.paseape.apipaseape.infrastructure.dto.response.DocumentUrlResDto;
+import com.paseape.apipaseape.infrastructure.dto.response.MascotaResDto;
 import com.paseape.apipaseape.infrastructure.dto.response.UsuarioResDto;
 import com.paseape.apipaseape.infrastructure.exception.BadRequestException;
 import com.paseape.apipaseape.infrastructure.mapper.dto.IClienteDtoMapper;
@@ -15,12 +19,21 @@ import com.paseape.apipaseape.infrastructure.mapper.dto.IUsuarioDtoMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.security.Principal;
+import java.util.ArrayList;
 import java.util.List;
+
+import static com.paseape.apipaseape.infrastructure.constant.Constant.ID_DOC_FOTO_MASCOTA;
+import static com.paseape.apipaseape.infrastructure.constant.Constant.ID_DOC_FOTO_PERFIL;
 
 @Service
 @RequiredArgsConstructor
 public class ClienteService {
+
+    private final DigitalDocumentService digitalDocumentService;
+    private final MascotaService mascotaService;
 
     private final IClienteRepository clienteRepository;
     private final IUsuarioRepository usuarioRepository;
@@ -42,11 +55,24 @@ public class ClienteService {
         };
 
         List<Mascota> mascotas = mascotaRepository.findAllByClienteId(cliente.getId());
+        List<MascotaResDto> mascotaResDtos = new ArrayList<>();
+        if (mascotas != null) {
+            for (Mascota mascota : mascotas) {
+                mascotaResDtos.add(mascotaService.poblarRespuestaMascota(mascota));
+            }
+        }
 
         UsuarioResDto usuarioResDto = usuarioDtoMapper.toResDto(usuario,cliente,null, clienteDtoMapper,null);
-        usuarioResDto.getCliente().setMascotas(mascotaDtoMapper.toResDtoList(mascotas));
+        usuarioResDto.getCliente().setMascotas(mascotaResDtos);
+        usuarioResDto.setFotoPerfilUrl(digitalDocumentService.urlFotoPerfil(usuario));
 
         return usuarioResDto;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public DocumentUrlResDto subirFotoCliente(Principal principal, MultipartFile file) throws BadRequestException{
+        Usuario usuario = usuarioRepository.findByCorreo(principal.getName());
+        return digitalDocumentService.subirFotoUsuario(usuario, file);
     }
 
 }

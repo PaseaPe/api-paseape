@@ -28,6 +28,7 @@ public class Usuario {
     private UsuarioEstado usuarioEstado;
     private TipoProveedorAuth tipoProveedorAuth;
     private String providerId;
+    private FolderDigitalDocument folderDigitalDocument;
     private Integer estado;
     private LocalDateTime creadoEl;
     private LocalDateTime actualizadoEl;

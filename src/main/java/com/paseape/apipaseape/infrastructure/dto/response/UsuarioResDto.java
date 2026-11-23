@@ -8,6 +8,8 @@ import lombok.Setter;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.annotation.JsonNaming;
 
+import java.util.List;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -31,6 +33,8 @@ public class UsuarioResDto {
     private Integer tipoProveedorAuthId;
     private String tipoProveedorAuthDescripcion;
     private Integer estado;
+
+    private List<DigitalDocumentResDto> digitalDocuments;
 
     private ClienteResDto cliente;
     private PaseadorResDto paseador;

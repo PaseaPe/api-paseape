@@ -5,7 +5,6 @@ import com.paseape.apipaseape.infrastructure.constant.Constant;
 import com.paseape.apipaseape.infrastructure.constant.MessageCodes;
 import com.paseape.apipaseape.infrastructure.constant.StatusCodes;
 import com.paseape.apipaseape.infrastructure.dto.request.CrearSolicitudInmediataReqDto;
-import com.paseape.apipaseape.infrastructure.dto.response.ErrorDetailDto;
 import com.paseape.apipaseape.infrastructure.dto.response.HeaderDto;
 import com.paseape.apipaseape.infrastructure.dto.response.ResponseDto;
 import com.paseape.apipaseape.infrastructure.dto.response.SolicitudPaseoResDto;
@@ -73,7 +72,7 @@ class SolicitudPaseoClienteControllerTest {
                 .codigoReserva("PAS-INM-202610-1234")
                 .build();
 
-        when(solicitudPaseoValidator.validarCrearSolicitudInmediata(req)).thenReturn(null);
+        when(solicitudPaseoValidator.validateCrearInmediata(req)).thenReturn(null);
         when(solicitudPaseoService.crearSolicitudInmediata("cliente@paseape.com", req)).thenReturn(resDto);
 
         ResponseEntity<ResponseDto<SolicitudPaseoResDto>> responseEntity = controller.crearSolicitudInmediata(
@@ -93,16 +92,15 @@ class SolicitudPaseoClienteControllerTest {
     }
 
     @Test
-    @DisplayName("crearSolicitudInmediata - Retorna ErrorDetailDto si el validador detecta errores sin llamar al servicio")
+    @DisplayName("crearSolicitudInmediata - Retorna ResponseDto de error si el validador detecta errores sin llamar al servicio")
     void testCrearSolicitudInmediata_ValidationError() throws BadRequestException {
         var req = CrearSolicitudInmediataReqDto.builder().build();
-        ErrorDetailDto valErr = ErrorDetailDto.builder()
-                .statusCode(StatusCodes.Code400)
-                .code(MessageCodes.ResponseCodeBR01)
-                .message("La lista de mascotas es obligatoria")
-                .build();
+        var valErr = new ResponseDto<>();
+        valErr.setStatusCode(StatusCodes.Code400);
+        valErr.setCode(MessageCodes.ResponseCodeBR01);
+        valErr.setMessage("La lista de mascotas es obligatoria");
 
-        when(solicitudPaseoValidator.validarCrearSolicitudInmediata(req)).thenReturn(valErr);
+        doReturn(valErr).when(solicitudPaseoValidator).validateCrearInmediata(req);
 
         ResponseEntity<ResponseDto<SolicitudPaseoResDto>> responseEntity = controller.crearSolicitudInmediata(
                 mockPrincipal,
@@ -125,7 +123,7 @@ class SolicitudPaseoClienteControllerTest {
                 .mascotaUuids(List.of(UUID.randomUUID().toString()))
                 .build();
 
-        when(solicitudPaseoValidator.validarCrearSolicitudInmediata(req)).thenReturn(null);
+        when(solicitudPaseoValidator.validateCrearInmediata(req)).thenReturn(null);
         when(solicitudPaseoService.crearSolicitudInmediata("cliente@paseape.com", req))
                 .thenThrow(new BadRequestException(MessageCodes.ResponseCodeBR03, "La mascota no pertenece al cliente autenticado."));
 
@@ -160,7 +158,7 @@ class SolicitudPaseoClienteControllerTest {
                 .codigoReserva("PAS-PROG-202610-ABCD")
                 .build();
 
-        when(solicitudPaseoValidator.validarCrearSolicitudProgramada(req)).thenReturn(null);
+        when(solicitudPaseoValidator.validateCrearProgramada(req)).thenReturn(null);
         when(solicitudPaseoService.crearSolicitudProgramada("cliente@paseape.com", req)).thenReturn(resDto);
 
         ResponseEntity<ResponseDto<SolicitudPaseoResDto>> responseEntity = controller.crearSolicitudProgramada(
@@ -180,16 +178,15 @@ class SolicitudPaseoClienteControllerTest {
     }
 
     @Test
-    @DisplayName("crearSolicitudProgramada - Retorna ErrorDetailDto si el validador detecta errores sin llamar al servicio")
+    @DisplayName("crearSolicitudProgramada - Retorna ResponseDto de error si el validador detecta errores sin llamar al servicio")
     void testCrearSolicitudProgramada_ValidationError() throws BadRequestException {
         var req = com.paseape.apipaseape.infrastructure.dto.request.CrearSolicitudProgramadaReqDto.builder().build();
-        ErrorDetailDto valErr = ErrorDetailDto.builder()
-                .statusCode(StatusCodes.Code400)
-                .code(MessageCodes.ResponseCodeBR01)
-                .message("El campo 'paseador_uuid' es obligatorio")
-                .build();
+        var valErr = new ResponseDto<>();
+        valErr.setStatusCode(StatusCodes.Code400);
+        valErr.setCode(MessageCodes.ResponseCodeBR01);
+        valErr.setMessage("El campo 'paseador_uuid' es obligatorio");
 
-        when(solicitudPaseoValidator.validarCrearSolicitudProgramada(req)).thenReturn(valErr);
+        doReturn(valErr).when(solicitudPaseoValidator).validateCrearProgramada(req);
 
         ResponseEntity<ResponseDto<SolicitudPaseoResDto>> responseEntity = controller.crearSolicitudProgramada(
                 mockPrincipal,
@@ -213,7 +210,7 @@ class SolicitudPaseoClienteControllerTest {
                 .mascotaUuids(List.of(UUID.randomUUID().toString()))
                 .build();
 
-        when(solicitudPaseoValidator.validarCrearSolicitudProgramada(req)).thenReturn(null);
+        when(solicitudPaseoValidator.validateCrearProgramada(req)).thenReturn(null);
         when(solicitudPaseoService.crearSolicitudProgramada("cliente@paseape.com", req))
                 .thenThrow(new BadRequestException(MessageCodes.ResponseCodeBR03, "El bloque horario no cuenta con cupo suficiente."));
 
@@ -227,5 +224,55 @@ class SolicitudPaseoClienteControllerTest {
         assertEquals(StatusCodes.Code400, responseEntity.getStatusCode().value());
         assertEquals(MessageCodes.ResponseCodeBR03, responseEntity.getBody().getCode());
         assertTrue(responseEntity.getBody().getMessage().contains("no cuenta con cupo suficiente"));
+    }
+
+    @Test
+    @DisplayName("obtenerUbicacionActual - Éxito con coordenadas en vivo retorna 200")
+    void testObtenerUbicacionActual_Exito() throws BadRequestException {
+        String uuid = UUID.randomUUID().toString();
+        var ubicacionDto = com.paseape.apipaseape.infrastructure.dto.response.UbicacionEnVivoResDto.builder()
+                .uuid(UUID.randomUUID().toString())
+                .solicitudPaseoUuid(uuid)
+                .latitud(BigDecimal.valueOf(-12.1025))
+                .longitud(BigDecimal.valueOf(-76.9880))
+                .senalDegradada(false)
+                .build();
+
+        when(solicitudPaseoValidator.validateObtenerUbicacionEnVivo("cliente@paseape.com", uuid)).thenReturn(null);
+        when(solicitudPaseoService.obtenerUbicacionEnVivo(uuid)).thenReturn(ubicacionDto);
+
+        ResponseEntity<ResponseDto<com.paseape.apipaseape.infrastructure.dto.response.UbicacionEnVivoResDto>> responseEntity = controller.obtenerUbicacionActual(
+                mockPrincipal,
+                null,
+                uuid
+        );
+
+        assertNotNull(responseEntity);
+        assertEquals(StatusCodes.Code200, responseEntity.getStatusCode().value());
+        assertEquals(MessageCodes.ResponseCodeS00, responseEntity.getBody().getCode());
+        assertEquals(Constant.MSJ_UBICACION_EN_VIVO_OBTENIDA, responseEntity.getBody().getMessage());
+        assertNotNull(responseEntity.getBody().getResponse());
+        assertEquals(BigDecimal.valueOf(-12.1025), responseEntity.getBody().getResponse().getLatitud());
+    }
+
+    @Test
+    @DisplayName("obtenerUbicacionActual - Espera de primera señal GPS retorna 200 con response null")
+    void testObtenerUbicacionActual_EsperaPrimeraSenal() throws BadRequestException {
+        String uuid = UUID.randomUUID().toString();
+
+        when(solicitudPaseoValidator.validateObtenerUbicacionEnVivo("cliente@paseape.com", uuid)).thenReturn(null);
+        when(solicitudPaseoService.obtenerUbicacionEnVivo(uuid)).thenReturn(null);
+
+        ResponseEntity<ResponseDto<com.paseape.apipaseape.infrastructure.dto.response.UbicacionEnVivoResDto>> responseEntity = controller.obtenerUbicacionActual(
+                mockPrincipal,
+                null,
+                uuid
+        );
+
+        assertNotNull(responseEntity);
+        assertEquals(StatusCodes.Code200, responseEntity.getStatusCode().value());
+        assertEquals(MessageCodes.ResponseCodeS00, responseEntity.getBody().getCode());
+        assertEquals(Constant.MSJ_ESPERA_PRIMERA_SENAL_GPS, responseEntity.getBody().getMessage());
+        assertNull(responseEntity.getBody().getResponse());
     }
 }

@@ -19,8 +19,12 @@ public interface ISolicitudPaseoMascotaJpaRepository extends JpaRepository<Solic
 
     @Query("SELECT spm FROM SolicitudPaseoMascotaEntity spm " +
             "JOIN FETCH spm.mascota m " +
+            "LEFT JOIN FETCH m.tipoMascota " +
             "LEFT JOIN FETCH m.tipoRaza " +
+            "LEFT JOIN FETCH m.tipoGeneroMascota " +
             "LEFT JOIN FETCH m.tipoTamanoMascota " +
+            "LEFT JOIN FETCH m.tipoNivelEnergia " +
+            "LEFT JOIN FETCH m.folderDigitalDocument " +
             "WHERE spm.solicitudPaseo.id = :solicitudPaseoId")
     List<SolicitudPaseoMascotaEntity> findAllBySolicitudPaseoIdWithDetails(@Param("solicitudPaseoId") Long solicitudPaseoId);
 

@@ -1,9 +1,16 @@
 package com.paseape.apipaseape.infrastructure.controller;
 
+import com.paseape.apipaseape.application.service.DigitalDocumentService;
+import com.paseape.apipaseape.infrastructure.constant.Constant;
 import com.paseape.apipaseape.infrastructure.dto.response.*;
+import com.paseape.apipaseape.infrastructure.validator.StorageValidator;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.paseape.apipaseape.application.service.MascotaService;
 import com.paseape.apipaseape.domain.entity.Cliente;
@@ -29,6 +36,8 @@ public class MascotaController extends BaseController {
     private final MascotaService mascotaService;
     private final MascotaValidator mascotaValidator;
     private final RequestService requestService;
+    private final DigitalDocumentService digitalDocumentService;
+    private final StorageValidator storageValidator;
 
     @PostMapping
     public ResponseEntity<ResponseDto<MascotaResDto>> registrarMascota(@RequestBody RegistrarMascotaReqDto request) {
@@ -226,6 +235,57 @@ public class MascotaController extends BaseController {
             response.setCode(MessageCodes.ResponseCodeE99);
             response.setMessage("Error interno al obtener el paseador");
             response.setHeader(requestService.getResponseHeader(Calendar.getInstance().getTime(), endDatetime));
+            return ResponseEntity.status(StatusCodes.Code500).body(response);
+        }
+    }
+
+    @PostMapping("/{mascotaUuid}/foto")
+    public ResponseEntity<ResponseDto<DocumentUrlResDto>> subirFotoMascota(
+            Principal principal,
+            @PathVariable String mascotaUuid,
+            @RequestParam("file") MultipartFile file) {
+        var response = new ResponseDto<DocumentUrlResDto>();
+        Date startDatetime = Calendar.getInstance().getTime();
+
+        try {
+            ErrorDetailDto validationError = mascotaValidator.validateSubirFotoMascota(principal, mascotaUuid, file);
+            if (validationError != null) {
+                Date endDatetime = Calendar.getInstance().getTime();
+                response.setStatusCode(validationError.getStatusCode());
+                response.setCode(validationError.getCode());
+                response.setMessage(validationError.getMessage());
+                response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
+                return ResponseEntity.status(response.getStatusCode()).body(response);
+            }
+
+            DocumentUrlResDto docDto = mascotaService.subirFotoMascota(principal, mascotaUuid, file);
+
+            Date endDatetime = Calendar.getInstance().getTime();
+            HeaderDto headerDto = requestService.getResponseHeader(startDatetime, endDatetime);
+
+            response.setStatusCode(StatusCodes.Code201);
+            response.setCode(MessageCodes.ResponseCodeS00);
+            response.setMessage("Foto de mascota almacenada exitosamente");
+            response.setHeader(headerDto);
+            response.setResponse(docDto);
+            return ResponseEntity.status(StatusCodes.Code201).body(response);
+        } catch (BadRequestException ex) {
+            String method = new Object() {}.getClass().getEnclosingMethod().getName();
+            logControllerError(logger, ex, this, method, "mascotaUuid=" + mascotaUuid);
+            Date endDatetime = Calendar.getInstance().getTime();
+            response.setStatusCode(StatusCodes.Code400);
+            response.setCode(ex.code != null ? ex.code : MessageCodes.ResponseCodeBR01);
+            response.setMessage(ex.getMessage());
+            response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
+            return ResponseEntity.status(StatusCodes.Code400).body(response);
+        } catch (Exception ex) {
+            String method = new Object() {}.getClass().getEnclosingMethod().getName();
+            logControllerError(logger, ex, this, method, "mascotaUuid=" + mascotaUuid);
+            Date endDatetime = Calendar.getInstance().getTime();
+            response.setStatusCode(StatusCodes.Code500);
+            response.setCode(MessageCodes.ResponseCodeE99);
+            response.setMessage("Error interno al subir la foto de la mascota");
+            response.setHeader(requestService.getResponseHeader(startDatetime, endDatetime));
             return ResponseEntity.status(StatusCodes.Code500).body(response);
         }
     }

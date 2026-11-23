@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.springframework.web.multipart.MultipartFile;
 import tools.jackson.databind.PropertyNamingStrategies;
 import tools.jackson.databind.annotation.JsonNaming;
 
@@ -33,5 +34,6 @@ public class MascotaReqDto {
     private Integer sociableConPerros;
     private Integer sociableConPersonas;
     private String precaucionesMedicas;
-    private String fotoUrl;
+
+    private MultipartFile fotoMascota;
 }

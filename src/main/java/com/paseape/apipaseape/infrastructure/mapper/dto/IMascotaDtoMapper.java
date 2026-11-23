@@ -1,11 +1,10 @@
 package com.paseape.apipaseape.infrastructure.mapper.dto;
 
+import com.paseape.apipaseape.domain.entity.Mascota;
 import com.paseape.apipaseape.infrastructure.dto.response.MascotaResDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
-
-import com.paseape.apipaseape.domain.entity.Mascota;
 
 import java.util.List;
 

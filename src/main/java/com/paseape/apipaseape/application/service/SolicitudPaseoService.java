@@ -10,6 +10,27 @@ import com.paseape.apipaseape.application.repository.IPaseadorRepository;
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoDescarteRepository;
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoMascotaRepository;
 import com.paseape.apipaseape.application.repository.ISolicitudPaseoRepository;
+import com.paseape.apipaseape.application.repository.ISolicitudPaseoUbicacionEnVivoRepository;
+import com.paseape.apipaseape.application.repository.ISolicitudPaseoRecorridoRepository;
+import com.paseape.apipaseape.domain.entity.SolicitudPaseoRecorrido;
+import com.paseape.apipaseape.infrastructure.dto.response.UbicacionEnVivoResDto;
+import com.paseape.apipaseape.infrastructure.dto.response.SolicitudPaseoRecorridoResDto;
+import com.paseape.apipaseape.infrastructure.mapper.dto.ISolicitudPaseoUbicacionEnVivoDtoMapper;
+import com.paseape.apipaseape.infrastructure.mapper.dto.ISolicitudPaseoRecorridoDtoMapper;
+
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+
+import com.paseape.apipaseape.domain.entity.SolicitudPaseoUbicacionEnVivo;
+import com.paseape.apipaseape.infrastructure.dto.request.RegistrarUbicacionesBatchReqDto;
+import com.paseape.apipaseape.infrastructure.dto.request.UbicacionPuntoReqDto;
+import com.paseape.apipaseape.infrastructure.dto.response.BatchIngestaResDto;
+import com.paseape.apipaseape.infrastructure.util.GeoDistanceCalculator;
+import com.paseape.apipaseape.infrastructure.util.PolylineDeltaEncoder;
+import com.paseape.apipaseape.infrastructure.util.UtilMethods;
+
+import java.time.ZoneOffset;
+
 import com.paseape.apipaseape.application.repository.ITipoDuracionPaseoRepository;
 import com.paseape.apipaseape.application.repository.IUsuarioRepository;
 import com.paseape.apipaseape.domain.entity.BloqueHorario;
@@ -28,6 +49,7 @@ import com.paseape.apipaseape.domain.entity.TipoDuracionPaseo;
 import com.paseape.apipaseape.domain.entity.TipoMetodoPago;
 import com.paseape.apipaseape.domain.entity.TipoModalidadPaseo;
 import com.paseape.apipaseape.domain.entity.TipoNotificacion;
+import com.paseape.apipaseape.domain.entity.TipoOrigenTraza;
 import com.paseape.apipaseape.domain.entity.Usuario;
 import com.paseape.apipaseape.infrastructure.constant.Constant;
 import com.paseape.apipaseape.infrastructure.constant.MessageCodes;
@@ -79,6 +101,10 @@ public class SolicitudPaseoService {
     private final INotificacionRepository notificacionRepository;
     private final ISolicitudPaseoDescarteRepository solicitudPaseoDescarteRepository;
     private final ISolicitudPaseoDtoMapper solicitudPaseoDtoMapper;
+    private final ISolicitudPaseoUbicacionEnVivoRepository solicitudPaseoUbicacionEnVivoRepository;
+    private final ISolicitudPaseoRecorridoRepository solicitudPaseoRecorridoRepository;
+    private final ISolicitudPaseoUbicacionEnVivoDtoMapper solicitudPaseoUbicacionEnVivoDtoMapper;
+    private final ISolicitudPaseoRecorridoDtoMapper solicitudPaseoRecorridoDtoMapper;
 
     @Transactional(rollbackFor = Exception.class)
     public SolicitudPaseoResDto crearSolicitudInmediata(String userEmail, CrearSolicitudInmediataReqDto reqDto) throws BadRequestException {
@@ -235,8 +261,8 @@ public class SolicitudPaseoService {
             int maxMascotasBloque = disp.getMaxMascotas() != null
                     ? disp.getMaxMascotas()
                     : (paseador.getMaxMascotasPredeterminado() != null
-                            ? paseador.getMaxMascotasPredeterminado()
-                            : Constant.CAPACIDAD_BASE_DEFAULT);
+                       ? paseador.getMaxMascotasPredeterminado()
+                       : Constant.CAPACIDAD_BASE_DEFAULT);
 
             Integer mascotasOcupadas = solicitudPaseoRepository.countMascotasOcupadas(
                     paseador.getId(),
@@ -617,10 +643,7 @@ public class SolicitudPaseoService {
                 .collect(Collectors.groupingBy(spm -> spm.getSolicitudPaseo().getId()));
 
         List<SolicitudPaseoResDto> dtoList = content.stream()
-                .map(s -> {
-                    List<SolicitudPaseoMascota> mascotas = mascotasPorSolicitud.getOrDefault(s.getId(), List.of());
-                    return solicitudPaseoDtoMapper.toResDto(s, mascotas);
-                })
+                .map(s -> toResDtoConHoraLima(s, mascotasPorSolicitud.getOrDefault(s.getId(), List.of())))
                 .toList();
 
         return PageResponseDto.<SolicitudPaseoResDto>builder()
@@ -932,6 +955,111 @@ public class SolicitudPaseoService {
         return solicitudPaseoDtoMapper.toResDto(guardada, mascotas);
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public SolicitudPaseoResDto finalizarPaseo(String userEmail, String solicitudUuid) throws BadRequestException {
+        Usuario usuario = usuarioRepository.findByCorreo(userEmail.trim().toLowerCase());
+        Paseador paseador = paseadorRepository.findByUsuarioId(usuario.getId());
+        SolicitudPaseo solicitud = solicitudPaseoRepository.findByUuidWithDetails(solicitudUuid.trim());
+        if (solicitud == null) {
+            solicitud = solicitudPaseoRepository.findByUuid(solicitudUuid.trim());
+        }
+
+        if (solicitud.getSolicitudPaseoEstado() != null
+                && Integer.valueOf(Constant.ID_ESTADO_SOLICITUD_FINALIZADA).equals(solicitud.getSolicitudPaseoEstado().getId())) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR03, Constant.MSJ_ERROR_PASEO_YA_FINALIZADO);
+        }
+
+        if (solicitud.getSolicitudPaseoEstado() == null
+                || !Integer.valueOf(Constant.ID_ESTADO_SOLICITUD_EN_CURSO).equals(solicitud.getSolicitudPaseoEstado().getId())) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR03, Constant.MSJ_ERROR_SOLICITUD_NO_FINALIZABLE);
+        }
+
+        solicitud.setSolicitudPaseoEstado(new SolicitudPaseoEstado(Constant.ID_ESTADO_SOLICITUD_FINALIZADA));
+        solicitud.setFechaHoraFinReal(LocalDateTime.now());
+        SolicitudPaseo guardada = solicitudPaseoRepository.save(solicitud);
+
+        // Consolidación de recorrido Strava-like
+        SolicitudPaseoUbicacionEnVivo enVivo = solicitudPaseoUbicacionEnVivoRepository.findBySolicitudPaseoId(guardada.getId());
+
+        long duracionCalc = 0;
+        if (guardada.getFechaHoraInicioReal() != null && guardada.getFechaHoraFinReal() != null) {
+            duracionCalc = ChronoUnit.SECONDS.between(guardada.getFechaHoraInicioReal(), guardada.getFechaHoraFinReal());
+            if (duracionCalc < 0) {
+                duracionCalc = 0;
+            }
+        }
+        int duracionSegundos = (int) duracionCalc;
+
+        BigDecimal distanciaMetros = BigDecimal.ZERO;
+        int totalPuntos = 0;
+        String coordenadasCodificadas = "";
+        BigDecimal velocidadPromedioKmh = BigDecimal.ZERO;
+
+        if (enVivo != null) {
+            if (enVivo.getDistanciaMetrosAcumulada() != null) {
+                distanciaMetros = enVivo.getDistanciaMetrosAcumulada();
+            }
+            if (enVivo.getTotalPuntos() != null) {
+                totalPuntos = enVivo.getTotalPuntos();
+            }
+            if (enVivo.getCoordenadasCodificadas() != null) {
+                coordenadasCodificadas = enVivo.getCoordenadasCodificadas();
+            }
+        }
+
+        if (duracionSegundos > 0 && distanciaMetros.compareTo(BigDecimal.ZERO) > 0) {
+            velocidadPromedioKmh = distanciaMetros.divide(BigDecimal.valueOf(duracionSegundos), 6, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(3.6))
+                    .setScale(2, RoundingMode.HALF_UP);
+            if (velocidadPromedioKmh.compareTo(BigDecimal.valueOf(999.99)) > 0) {
+                velocidadPromedioKmh = BigDecimal.valueOf(999.99);
+            }
+        }
+
+        SolicitudPaseoRecorrido recorrido = SolicitudPaseoRecorrido.builder()
+                .uuid(UUID.randomUUID().toString())
+                .solicitudPaseo(guardada)
+                .tipoOrigenTraza(new TipoOrigenTraza(Constant.ID_ORIGEN_TRAZA_GPS_TIEMPO_REAL))
+                .distanciaMetros(distanciaMetros)
+                .duracionSegundos(duracionSegundos)
+                .velocidadPromedioKmh(velocidadPromedioKmh)
+                .coordenadasCodificadas(coordenadasCodificadas)
+                .coordenadasTotalPuntos(totalPuntos)
+                .estado(Constant.ESTADO_LOGICO_ACTIVO)
+                .build();
+        solicitudPaseoRecorridoRepository.save(recorrido);
+
+        if (enVivo != null) {
+            solicitudPaseoUbicacionEnVivoRepository.deleteBySolicitudPaseoId(guardada.getId());
+        }
+
+        paseador.incrementarPaseosCompletados();
+        paseadorRepository.save(paseador);
+
+
+        // Notificación interna para el cliente
+        Usuario destinatario = guardada.getCliente() != null ? guardada.getCliente().getUsuario() : null;
+        if (destinatario != null) {
+            String paseadorNombre = obtenerNombreCompletoPaseador(usuario, paseador);
+            Notificacion notificacion = Notificacion.builder()
+                    .uuid(UUID.randomUUID().toString())
+                    .remitenteUsuario(usuario)
+                    .destinatarioUsuario(destinatario)
+                    .tipoNotificacion(new TipoNotificacion(Constant.ID_TIPO_NOTIFICACION_PASEO_FINALIZADO))
+                    .titulo(Constant.TITULO_NOTIF_PASEO_FINALIZADO)
+                    .mensaje("El paseador " + paseadorNombre + " ha finalizado el paseo " + guardada.getCodigoReserva() + " de tus mascotas. Ya puedes revisar el recorrido y calificar el servicio.")
+                    .referenciaId(guardada.getId())
+                    .referenciaTipo(Constant.REFERENCIA_TIPO_SOLICITUD_PASEO)
+                    .leido(false)
+                    .estado(Constant.ESTADO_LOGICO_ACTIVO)
+                    .build();
+            notificacionRepository.save(notificacion);
+        }
+
+        List<SolicitudPaseoMascota> mascotasFinal = solicitudPaseoMascotaRepository.findAllBySolicitudPaseoIdWithDetails(guardada.getId());
+        return solicitudPaseoDtoMapper.toResDto(guardada, mascotasFinal);
+    }
+
     @Transactional(readOnly = true)
     public PageResponseDto<SolicitudPaseoResDto> obtenerBandejaCliente(String userEmail, String tab, int page, int size) throws BadRequestException {
         if (userEmail == null || userEmail.trim().isEmpty()) {
@@ -1017,10 +1145,7 @@ public class SolicitudPaseoService {
                 .collect(Collectors.groupingBy(spm -> spm.getSolicitudPaseo().getId()));
 
         List<SolicitudPaseoResDto> dtoList = content.stream()
-                .map(s -> {
-                    List<SolicitudPaseoMascota> mascotas = mascotasPorSolicitud.getOrDefault(s.getId(), List.of());
-                    return solicitudPaseoDtoMapper.toResDto(s, mascotas);
-                })
+                .map(s -> toResDtoConHoraLima(s, mascotasPorSolicitud.getOrDefault(s.getId(), List.of())))
                 .toList();
 
         return PageResponseDto.<SolicitudPaseoResDto>builder()
@@ -1135,5 +1260,140 @@ public class SolicitudPaseoService {
             paseadorNombre = (paseador.getUsuario().getNombres() + " " + (paseador.getUsuario().getApellidos() != null ? paseador.getUsuario().getApellidos() : "")).trim();
         }
         return !paseadorNombre.isEmpty() ? paseadorNombre : "Un paseador";
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public BatchIngestaResDto registrarUbicacionesTelemetria(String userEmail, String solicitudUuid, RegistrarUbicacionesBatchReqDto reqDto) {
+        SolicitudPaseo solicitud = solicitudPaseoRepository.findByUuid(solicitudUuid.trim());
+        List<UbicacionPuntoReqDto> puntos = reqDto.getUbicaciones();
+        SolicitudPaseoUbicacionEnVivo ubicacionEnVivo = solicitudPaseoUbicacionEnVivoRepository.findBySolicitudPaseoId(solicitud.getId());
+        LocalDateTime ahoraUtc = LocalDateTime.now(ZoneOffset.UTC);
+
+        if (ubicacionEnVivo == null) {
+            UbicacionPuntoReqDto p0 = puntos.get(0);
+            String initialEncoded = PolylineDeltaEncoder.codificarPuntoInicial(p0.getLatitud(), p0.getLongitud());
+            StringBuilder polylineBuilder = new StringBuilder(initialEncoded);
+
+            BigDecimal refLat = p0.getLatitud();
+            BigDecimal refLng = p0.getLongitud();
+            double distanciaAcumulada = 0.0;
+            int totalPuntos = 1;
+
+            for (int i = 1; i < puntos.size(); i++) {
+                UbicacionPuntoReqDto pi = puntos.get(i);
+                double dist = GeoDistanceCalculator.calcularDistanciaMetros(refLat, refLng, pi.getLatitud(), pi.getLongitud());
+                if (dist >= 3.0) {
+                    polylineBuilder.append(PolylineDeltaEncoder.concatenarPuntoDelta(refLat, refLng, pi.getLatitud(), pi.getLongitud()));
+                    distanciaAcumulada += dist;
+                    totalPuntos++;
+                    refLat = pi.getLatitud();
+                    refLng = pi.getLongitud();
+                }
+            }
+
+            UbicacionPuntoReqDto pUltimo = puntos.get(puntos.size() - 1);
+
+            ubicacionEnVivo = SolicitudPaseoUbicacionEnVivo.builder()
+                    .uuid(UUID.randomUUID().toString())
+                    .solicitudPaseo(solicitud)
+                    .latitudActual(pUltimo.getLatitud())
+                    .longitudActual(pUltimo.getLongitud())
+                    .precisionM(pUltimo.getPrecisionM())
+                    .velocidadMs(pUltimo.getVelocidadMs())
+                    .rumboGrados(pUltimo.getRumboGrados())
+                    .fechaHoraGps(pUltimo.getFechaHoraGps())
+                    .coordenadasCodificadas(polylineBuilder.toString())
+                    .distanciaMetrosAcumulada(BigDecimal.valueOf(distanciaAcumulada).setScale(2, RoundingMode.HALF_UP))
+                    .totalPuntos(totalPuntos)
+                    .estado(Constant.ESTADO_LOGICO_ACTIVO)
+                    .creadoEl(ahoraUtc)
+                    .creadoPor(userEmail.trim().toLowerCase())
+                    .actualizadoEl(ahoraUtc)
+                    .actualizadoPor(userEmail.trim().toLowerCase())
+                    .build();
+        } else {
+            StringBuilder polylineBuilder = new StringBuilder(
+                    ubicacionEnVivo.getCoordenadasCodificadas() != null ? ubicacionEnVivo.getCoordenadasCodificadas() : ""
+            );
+            BigDecimal refLat = ubicacionEnVivo.getLatitudActual();
+            BigDecimal refLng = ubicacionEnVivo.getLongitudActual();
+            double distanciaAcumulada = ubicacionEnVivo.getDistanciaMetrosAcumulada() != null
+                    ? ubicacionEnVivo.getDistanciaMetrosAcumulada().doubleValue()
+                    : 0.0;
+            int totalPuntos = ubicacionEnVivo.getTotalPuntos() != null ? ubicacionEnVivo.getTotalPuntos() : 0;
+
+            for (UbicacionPuntoReqDto pi : puntos) {
+                double dist = GeoDistanceCalculator.calcularDistanciaMetros(refLat, refLng, pi.getLatitud(), pi.getLongitud());
+                if (dist >= 3.0) {
+                    polylineBuilder.append(PolylineDeltaEncoder.concatenarPuntoDelta(refLat, refLng, pi.getLatitud(), pi.getLongitud()));
+                    distanciaAcumulada += dist;
+                    totalPuntos++;
+                    refLat = pi.getLatitud();
+                    refLng = pi.getLongitud();
+                }
+            }
+
+            UbicacionPuntoReqDto pUltimo = puntos.get(puntos.size() - 1);
+
+            ubicacionEnVivo.setLatitudActual(pUltimo.getLatitud());
+            ubicacionEnVivo.setLongitudActual(pUltimo.getLongitud());
+            ubicacionEnVivo.setPrecisionM(pUltimo.getPrecisionM());
+            ubicacionEnVivo.setVelocidadMs(pUltimo.getVelocidadMs());
+            ubicacionEnVivo.setRumboGrados(pUltimo.getRumboGrados());
+            ubicacionEnVivo.setFechaHoraGps(pUltimo.getFechaHoraGps());
+            ubicacionEnVivo.setCoordenadasCodificadas(polylineBuilder.toString());
+            ubicacionEnVivo.setDistanciaMetrosAcumulada(BigDecimal.valueOf(distanciaAcumulada).setScale(2, RoundingMode.HALF_UP));
+            ubicacionEnVivo.setTotalPuntos(totalPuntos);
+            ubicacionEnVivo.setActualizadoEl(ahoraUtc);
+            ubicacionEnVivo.setActualizadoPor(userEmail.trim().toLowerCase());
+        }
+
+        solicitudPaseoUbicacionEnVivoRepository.save(ubicacionEnVivo);
+
+        return BatchIngestaResDto.builder()
+                .puntosProcesados(puntos.size())
+                .paseoActivo(true)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public UbicacionEnVivoResDto obtenerUbicacionEnVivo(String solicitudUuid) {
+        SolicitudPaseo solicitud = solicitudPaseoRepository.findByUuid(solicitudUuid.trim());
+        if (solicitud == null) {
+            return null;
+        }
+        SolicitudPaseoUbicacionEnVivo ubicacionEnVivo = solicitudPaseoUbicacionEnVivoRepository.findBySolicitudPaseoId(solicitud.getId());
+        if (ubicacionEnVivo == null) {
+            return null;
+        }
+        long retrasoSegundos = 0L;
+        if (ubicacionEnVivo.getFechaHoraGps() != null) {
+            retrasoSegundos = Math.abs(Duration.between(ubicacionEnVivo.getFechaHoraGps(), LocalDateTime.now(ZoneOffset.UTC)).getSeconds());
+        }
+        boolean senalDegradada = retrasoSegundos > 45;
+        return solicitudPaseoUbicacionEnVivoDtoMapper.toResDto(ubicacionEnVivo, senalDegradada);
+    }
+
+    @Transactional(readOnly = true)
+    public SolicitudPaseoRecorridoResDto obtenerRecorridoConsolidado(String solicitudUuid) throws BadRequestException {
+        SolicitudPaseo solicitud = solicitudPaseoRepository.findByUuidWithDetails(solicitudUuid.trim());
+        if (solicitud == null) {
+            solicitud = solicitudPaseoRepository.findByUuid(solicitudUuid.trim());
+        }
+        if (solicitud == null) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR98, "No se encontró la solicitud de paseo.");
+        }
+        SolicitudPaseoRecorrido recorrido = solicitudPaseoRecorridoRepository.findBySolicitudPaseoId(solicitud.getId());
+        if (recorrido == null) {
+            throw new BadRequestException(MessageCodes.ResponseCodeBR98, "No se encontró el recorrido histórico consolidado para este paseo.");
+        }
+        return solicitudPaseoRecorridoDtoMapper.toResDto(recorrido);
+    }
+
+    private SolicitudPaseoResDto toResDtoConHoraLima(SolicitudPaseo solicitud, List<SolicitudPaseoMascota> mascotas) {
+        SolicitudPaseoResDto dto = solicitudPaseoDtoMapper.toResDto(solicitud, mascotas);
+        dto.setHoraVencimiento(UtilMethods.convertirUtcALima(dto.getHoraVencimiento()));
+        dto.setCreadoEl(UtilMethods.convertirUtcALima(dto.getCreadoEl()));
+        return dto;
     }
 }
