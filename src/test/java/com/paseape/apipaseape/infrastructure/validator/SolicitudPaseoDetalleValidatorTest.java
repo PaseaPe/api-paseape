@@ -76,6 +76,24 @@ class SolicitudPaseoDetalleValidatorTest {
     }
 
     @Test
+    @DisplayName("validateObtenerDetalle - Éxito para cualquier paseador aunque no esté asignado")
+    void testValidateObtenerDetalle_CualquierPaseadorExito() {
+        String uuid = UUID.randomUUID().toString();
+        Usuario usuario = Usuario.builder().id(21L).correo("otro.paseador@paseape.com").tipoUsuario(new TipoUsuario(Constant.ID_PASEADOR)).build();
+        Paseador paseador = Paseador.builder().id(6L).usuario(usuario).build();
+        Cliente cliente = Cliente.builder().id(1L).build();
+        SolicitudPaseo solicitud = SolicitudPaseo.builder().id(100L).uuid(uuid).cliente(cliente).paseador(null).build();
+
+        when(usuarioRepository.findByCorreo("otro.paseador@paseape.com")).thenReturn(usuario);
+        when(solicitudPaseoRepository.findByUuidWithDetails(uuid)).thenReturn(solicitud);
+        when(clienteRepository.findByUsuarioId(21L)).thenReturn(null);
+        when(paseadorRepository.findByUsuarioId(21L)).thenReturn(paseador);
+
+        ResponseDto<?> error = validator.validateObtenerDetalle("otro.paseador@paseape.com", uuid);
+        assertNull(error);
+    }
+
+    @Test
     @DisplayName("validateObtenerDetalle - Éxito para administrador retorna null")
     void testValidateObtenerDetalle_AdminExito() {
         String uuid = UUID.randomUUID().toString();

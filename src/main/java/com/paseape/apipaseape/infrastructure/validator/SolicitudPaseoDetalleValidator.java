@@ -57,11 +57,9 @@ public class SolicitudPaseoDetalleValidator {
                     && cliente.getId().equals(solicitud.getCliente().getId());
 
             Paseador paseador = paseadorRepository.findByUsuarioId(usuario.getId());
-            boolean esPaseadorAsignado = paseador != null
-                    && solicitud.getPaseador() != null
-                    && paseador.getId().equals(solicitud.getPaseador().getId());
+            boolean esPaseador = paseador != null;
 
-            if (!esAdmin && !esClienteDueno && !esPaseadorAsignado) {
+            if (!esAdmin && !esClienteDueno && !esPaseador) {
                 throw new BadRequestException(MessageCodes.ResponseCodeBR03, "No tiene permisos para consultar el detalle de esta solicitud de paseo.");
             }
 
