@@ -1,4 +1,4 @@
--- =============================================================================
+ -- =============================================================================
 -- PROYECTO TECNOLÓGICO: PaseaPe (Lima 2026)
 -- SPRINT 4: MIGRACIÓN V2.3.0 (CALIFICACIONES, OPINIONES, REPORTES, PENALIDADES Y SANCIONES)
 -- Motor: MySQL 8 (Aiven Cloud Managed / Local) | Base de datos: paseape_db

@@ -43,6 +43,12 @@ Migración Flyway creada en `src/main/resources/db/migration/V2.3.0__sprint_4_re
   * `usuario_sancion`: Historial de bloqueos (`TEMPORAL` | `PERMANENTE`), origen (`MANUAL_ADMIN` | `AUTOMATICO_PENALIDAD`), `fecha_inicio`, `fecha_fin`, `activa BIT` y campos de levantamiento anticipado.
   * `usuario_penalidad`: Ledger de infracciones con `puntos_aplicados`, `fecha_expiracion_puntos`, `detalle_evidencia`, vínculo opcional a `usuario_sancion_id` y soporte de anulación administrativa (`anulada BIT`).
 
+### 2.3. Catálogo de Motivos de Cancelación (`V2.3.1`)
+* Migración creada en `src/main/resources/db/migration/V2.3.1__tipo_motivo_cancelacion_schema.sql`.
+* **`tipo_motivo_cancelacion` (`INT`):** Catálogo maestro para el combo de cancelación en la app móvil (`id`, `uuid`, `descripcion`, `rol_aplicable` [`CLIENTE` | `PASEADOR` | `AMBOS`], `tipo_penalidad_id` nullable hacia `tipo_penalidad`, `requiere_comentario BIT`).
+  * **Semillas Paseador:** `1`: Cliente no entregó la mascota (`NO_SHOW_CLIENTE` [4]), `2`: Emergencia personal (`CANCELACION_TARDIA_PASEADOR` [1]), `3`: Fuerza mayor / clima extremo (`NULL`).
+  * **Semillas Cliente:** `4`: Paseador no responde o tiene retraso (`NULL`), `5`: Cambio de planes (`CANCELACION_TARDIA_CLIENTE` [2]), `6`: Error al seleccionar fecha/hora/mascotas (`CANCELACION_TARDIA_CLIENTE` [2]).
+
 ---
 
 ## 3. Historias de Usuario Implementadas: Mantenedor de Catálogos
@@ -182,8 +188,9 @@ Migración Flyway creada en `src/main/resources/db/migration/V2.3.0__sprint_4_re
 
 #### Diseño de Implementación Previsto
 * **Endpoints:**
-  * *Base HU35/HU36 (creación por usuario):* `POST /api-paseape/reportes` (acepta `solicitud_paseo_uuid` opcional, `usuario_reportado_uuid` opcional, `categoria_reporte_id`, `titulo`, `descripcion` y evidencias opcionales en `folder_digital_document`).
-  * *HU37 (gestión Admin):*
+  * *Base HU35/HU36 (creación por usuario):* `POST /api-paseape/reportes` (`multipart/form-data`): recibe los datos del reporte (`solicitud_paseo_uuid` opcional, `usuario_reportado_uuid` opcional, `categoria_reporte_id`, `titulo`, `descripcion`) junto con las fotos/capturas de evidencia en la misma petición. Si se adjuntan archivos, crea el `folder_digital_document`, los sube a OCI Object Storage y registra cada `digital_document` con tipo `5: EVIDENCIA_REPORTE`. En el frontend, el combo opcional de paseo relacionado lista todos los paseos del usuario mostrando el formato `codigo_reserva (folio) - fecha - estado`.
+  * *Notificación al crear reporte:* Al persistirse el reporte, se registra la notificación interna `REPORTE_RECIBIDO` (ID `8`) **tanto para el usuario reportante** (confirmación de recepción) **como para los administradores activos** (alerta operativa en bandeja).
+  * *HU37 (gestión Admin — accesible desde el menú lateral vertical del botón hamburguesa):*
     * `GET /api-paseape/admin/reportes?estado_id=&categoria_id=&page=0&size=10`
     * `GET /api-paseape/admin/reportes/{uuid}`
     * `PATCH /api-paseape/admin/reportes/{uuid}/gestionar` (asignación de administrador, cambio de estado `EN_REVISION` / `RESUELTO` / `DESESTIMADO`, `comentario_interno`, `resolucion_resumen`, `visible_usuario` y opción de disparar penalidad grave).
@@ -206,9 +213,12 @@ Migración Flyway creada en `src/main/resources/db/migration/V2.3.0__sprint_4_re
 
 #### Diseño de Implementación Previsto
 * **Endpoints:**
-  * `POST /api-paseape/admin/usuarios/{uuid}/sanciones` (aplicar bloqueo `TEMPORAL` o `PERMANENTE`).
-  * `PATCH /api-paseape/admin/sanciones/{uuid}/levantar` (levantamiento anticipado con `motivo_levantamiento`).
-  * `GET /api-paseape/admin/usuarios/{uuid}/sanciones` (historial de sanciones y penalidades del usuario).
+  * *Admin (HU40):*
+    * `POST /api-paseape/admin/usuarios/{uuid}/sanciones` (aplicar bloqueo `TEMPORAL` o `PERMANENTE`).
+    * `PATCH /api-paseape/admin/sanciones/{uuid}/levantar` (levantamiento anticipado con `motivo_levantamiento`).
+    * `GET /api-paseape/admin/usuarios/{uuid}/sanciones` (historial de sanciones y penalidades del usuario).
+  * *Usuario autenticado (Cliente y Paseador — Transparencia de Cuenta):*
+    * `GET /api-paseape/mi-cuenta/estado-sanciones`: expone los puntos vigentes acumulados, el detalle de penalidades activas con su fecha de vencimiento y la sanción activa (si existe), junto al umbral vigente para alimentar la vista `SCR_S4_08_MiEstadoCuenta_SancionesPuntos` y el modal informativo amigable.
 * **Reglas de Negocio (`SancionService` + `SancionValidator`):**
   * Solo `ADMINISTRADOR` activo puede sancionar; no puede sancionarse a sí mismo ni a un `superadmin`.
   * `tipo_sancion = TEMPORAL` exige `duracion_horas > 0` (calculando `fecha_fin = fecha_inicio.plusHours(duracionHoras)` en UTC); `PERMANENTE` fija `fecha_fin = null`.
@@ -224,13 +234,18 @@ Implementado de forma desacoplada en `PenalidadService` y disparado desde `Solic
 
 | Código (`tipo_penalidad`) | Actor | Disparador y Umbral | Puntos | Vigencia |
 | :--- | :--- | :--- | :---: | :---: |
-| `CANCELACION_TARDIA_PASEADOR` | Paseador | Cancela `ACEPTADA` [2] con `< 2h` antes de `hora_inicio` (programado) o `> 3 min` tras `fecha_hora_aceptada` (inmediato) | **2** | 30 días |
-| `CANCELACION_TARDIA_CLIENTE` | Cliente | Cancela `ACEPTADA` [2] con `< 1h` antes de `hora_inicio` (programado) o `> 3 min` tras `fecha_hora_aceptada` (inmediato) | **1** | 30 días |
+| `CANCELACION_TARDIA_PASEADOR` | Paseador | Cancela `ACEPTADA` [2] con motivo atribuible al paseador y `< 2h` antes de `hora_inicio` (programado) o `> 3 min` tras `fecha_hora_aceptada` (inmediato) | **2** | 30 días |
+| `CANCELACION_TARDIA_CLIENTE` | Cliente | Cancela `ACEPTADA` [2] con motivo atribuible al cliente y `< 1h` antes de `hora_inicio` (programado) o `> 3 min` tras `fecha_hora_aceptada` (inmediato) | **1** | 30 días |
 | `NO_SHOW_PASEADOR` | Paseador | Job en `AppTaskScheduler`: `ACEPTADA` [2] sin `fecha_hora_inicio_real` tras `+15 min` de `hora_inicio` (programado) o `+25 min` de `fecha_hora_aceptada` (inmediato) | **3** | 30 días |
-| `NO_SHOW_CLIENTE` | Cliente | Espera vencida de `+15 min` sin entrega de mascota tras llegada del paseador | **2** | 30 días |
+| `NO_SHOW_CLIENTE` | Cliente | El paseador cancela en `PATCH /paseador/solicitudes/{uuid}/cancelar` seleccionando el motivo de combo correspondiente a ausencia/no entrega de mascota del cliente (+15 min de espera) | **2** | 30 días |
 | `FINALIZACION_ANTICIPADA` | Paseador | En `finalizarPaseo` (HU28): `duracion_segundos < 80%` de `tipo_duracion_paseo.minutos * 60` | **2** | 30 días |
 | `TELEMETRIA_INSUFICIENTE` | Paseador | En `finalizarPaseo` (HU28): duración `>= 15 min` con `0` puntos GPS o distancia `< 50 m` | **1** | 30 días |
 | `REPORTE_GRAVE_CONFIRMADO` | Ambos | Resolución de reporte en HU37 confirmando falta grave (maltrato, suplantación, agresión) | **5** | 60 días |
+
+### Flujo de Cancelación con Motivos Parametrizados (`/application-parameters`)
+* **Catálogo para Combo en App:** `GET /api-paseape/application-parameters` expondrá la lista de `tipo_motivo_cancelacion` activos (`id`, `uuid`, `descripcion`, `rol_aplicable`) para poblar el selector desplegable de cancelación tanto del cliente como del paseador.
+* **Contrato de Cancelación (`CancelarSolicitudReqDto`):** Los endpoints `PATCH /cliente/solicitudes/{uuid}/cancelar` y `PATCH /paseador/solicitudes/{uuid}/cancelar` reciben `motivo_cancelacion_id` (seleccionado del combo) junto con el campo de texto `motivo` (comentario explicativo).
+* **Evaluación de Penalidad por Responsabilidad:** `SolicitudPaseoService` inspecciona el `tipo_motivo_cancelacion` seleccionado para determinar si no aplica penalidad (fuerza mayor/sin culpa), si penaliza al usuario que cancela (`CANCELACION_TARDIA_*`) o si penaliza a la contraparte (ej. `NO_SHOW_CLIENTE` cuando el paseador cancela porque el cliente no entregó la mascota).
 
 ### Reglas de Escalamiento Automático
 Al registrar una falta en `usuario_penalidad` (con idempotencia garantizada por `UNIQUE(solicitud_paseo_id, usuario_id, tipo_penalidad_id)`), `PenalidadService` suma los `puntos_aplicados` vigentes (`anulada = 0` y `fecha_expiracion_puntos > UTC_NOW()`):
@@ -258,6 +273,7 @@ Todas las rutas operan bajo `/api-paseape` retornando `ResponseDto<T>`:
 | `POST` | `/admin/usuarios/{uuid}/sanciones` | `ADMINISTRADOR` | HU40 | **PENDIENTE** |
 | `PATCH` | `/admin/sanciones/{uuid}/levantar` | `ADMINISTRADOR` | HU40 | **PENDIENTE** |
 | `GET` | `/admin/usuarios/{uuid}/sanciones` | `ADMINISTRADOR` | HU40 | **PENDIENTE** |
+| `GET` | `/mi-cuenta/estado-sanciones` | `CLIENTE`, `PASEADOR` | Transparencia Puntaje | **PENDIENTE** |
 
 ---
 
