@@ -13,9 +13,9 @@ El Sprint 4 consolida dos frentes principales en la plataforma **PaseaPe**:
 | Módulo / Historia | Descripción | Estado |
 | :--- | :--- | :--- |
 | **HU41 – HU44 (Catálogos)** | Mantenedor administrativo de catálogos (listar, crear, actualizar, desactivar y reactivar) | **IMPLEMENTADO Y VERIFICADO** |
-| **HU32** | Calificar al paseador después del servicio (1 a 5 estrellas) | **PENDIENTE** |
-| **HU33** | Escribir una opinión sobre el servicio | **PENDIENTE** |
-| **HU34** | Consultar el promedio de calificaciones y opiniones como paseador | **PENDIENTE** |
+| **HU32** | Calificar al paseador después del servicio (1 a 5 estrellas) | **IMPLEMENTADO Y VERIFICADO** |
+| **HU33** | Escribir una opinión sobre el servicio | **IMPLEMENTADO Y VERIFICADO** |
+| **HU34** | Consultar el promedio de calificaciones y opiniones como paseador | **IMPLEMENTADO Y VERIFICADO** |
 | **HU37** | Revisar y gestionar reportes y reclamos de usuarios (Admin) | **PENDIENTE** |
 | **HU40** | Bloquear temporal o permanentemente cuentas que incumplan normas (Admin) | **PENDIENTE** |
 | **Motor de Penalidades** | Detección automática de faltas operativas y escalamiento a sanciones | **PENDIENTE** |
@@ -114,17 +114,17 @@ Migración Flyway creada en `src/main/resources/db/migration/V2.3.0__sprint_4_re
 ### A. HU32 – Calificar al paseador después del servicio
 * **Identificador:** HU32 | **Rol:** Cliente (Dueño) | **Estimación:** 1 día | **Prioridad:** 42 | **Puntos:** 2
 * **Dependencias:** HU28 (Finalizar paseo), HU30 (Historial cliente)
-* **Estado:** **PENDIENTE**
+* **Estado:** **IMPLEMENTADO Y VERIFICADO**
 
 #### Criterios de Aceptación
 1. **Escenario 1 – Calificación de un servicio completado:** Dado que el dueño tiene un paseo en estado `FINALIZADA` (6), cuando envíe una puntuación entera entre `1` y `5`, el sistema guarda la calificación en `paseo_calificacion` asociada al servicio, cliente y paseador, y recalcula el promedio del paseador.
 2. **Escenario 2 – Intento de calificar un servicio no completado:** Dado que el paseo está en `PENDIENTE`, `SOLICITADA_BUSCANDO`, `ACEPTADA`, `EN_CURSO`, `CANCELADA`, `RECHAZADA` o `VENCIDA`, el sistema rechaza la operación con `BadRequestException`.
 
 #### Diseño de Implementación Previsto
-* **Endpoint:** `POST /api-paseape/cliente/solicitudes/{uuid}/calificacion`
-* **DTOs:** `RegistrarCalificacionReqDto` (`puntuacion`) → `CalificacionResDto` (`uuid`, `solicitud_paseo_uuid`, `puntuacion`, `comentario`, `creado_el`).
+* **Endpoint:** `POST /api-paseape/calificaciones/solicitudes/{uuid}`
+* **DTOs:** `RegistrarCalificacionReqDto` (`puntuacion`, `comentario` opcional) → `CalificacionResDto` (`uuid`, `solicitud_paseo_uuid`, `puntuacion`, `comentario`, `fecha_comentario`, `creado_el`).
 * **Validador (`CalificacionValidator.validateRegistrarCalificacion`):**
-  * Verifica sesión activa con rol `CLIENTE`, formato UUID v4 de `solicitud_uuid`, `puntuacion` no nula y en rango `[1, 5]`.
+  * Verifica sesión activa con rol `CLIENTE`, formato UUID v4 de `solicitud_uuid`, `puntuacion` no nula y en rango `[1, 5]`; si se envía `comentario` no vacío tras `trim()`, valida longitud entre **5** y **1000** caracteres.
 * **Servicio (`CalificacionService.registrarCalificacion` con `@Transactional(rollbackFor = Exception.class)`):**
   * Verifica existencia de `SolicitudPaseo` y titularidad del cliente autenticado.
   * Exige `solicitudPaseoEstado.id == Constant.ID_ESTADO_SOLICITUD_FINALIZADA` (6).
@@ -138,29 +138,26 @@ Migración Flyway creada en `src/main/resources/db/migration/V2.3.0__sprint_4_re
 ### B. HU33 – Escribir una opinión sobre el servicio
 * **Identificador:** HU33 | **Rol:** Cliente (Dueño) | **Estimación:** 1 día | **Prioridad:** 39 | **Puntos:** 2
 * **Dependencias:** HU28, HU32
-* **Estado:** **PENDIENTE**
+* **Estado:** **IMPLEMENTADO Y VERIFICADO**
 
 #### Criterios de Aceptación
 1. **Escenario 1 – Registro de una opinión:** Dado que el dueño tiene un paseo `FINALIZADA` (6) y ya registró su calificación en HU32, cuando envíe su comentario, el sistema lo persiste en `paseo_calificacion.comentario` junto a `fecha_comentario = UTC_NOW()`.
 2. **Escenario 2 – Opinión vacía:** Dado que el dueño intenta enviar un comentario nulo, vacío o solo espacios en blanco, el sistema rechaza la petición solicitando el contenido requerido.
 
 #### Diseño de Implementación Previsto
-* **Endpoint:** `PATCH /api-paseape/cliente/solicitudes/{uuid}/opinion`
-* **DTOs:** `RegistrarOpinionReqDto` (`comentario`) → `CalificacionResDto`.
-* **Validador (`CalificacionValidator.validateRegistrarOpinion`):**
-  * Valida sesión `CLIENTE`, UUID v4 de la solicitud, `comentario` no vacío tras `trim()`, longitud mínima **5** y máxima **1000** caracteres.
-* **Servicio (`CalificacionService.registrarOpinion`):**
-  * Verifica titularidad del cliente y estado `FINALIZADA` (6).
-  * Recupera `PaseoCalificacion` por `solicitud_paseo_id`; si es `null`, lanza error indicando que primero debe calificar el servicio (HU32).
-  * Impide sobrescribir si `fecha_comentario != null` (una opinión por servicio).
-  * Actualiza `comentario` y `fecha_comentario = LocalDateTime.now(ZoneOffset.UTC)` y persiste.
+* **Endpoint unificado:** `POST /api-paseape/calificaciones/solicitudes/{uuid}` (integrado en HU32).
+* **DTOs:** `RegistrarCalificacionReqDto` (`puntuacion`, `comentario` opcional) → `CalificacionResDto`.
+* **Validador (`CalificacionValidator.validateRegistrarCalificacion`):**
+  * Si se envía `comentario` no vacío tras `trim()`, valida longitud mínima **5** y máxima **1000** caracteres.
+* **Servicio (`CalificacionService.registrarCalificacion`):**
+  * Si se envía `comentario` válido, persiste `comentario.trim()` junto a `fecha_comentario = LocalDateTime.now(ZoneOffset.UTC)` en el mismo registro de calificación.
 
 ---
 
 ### C. HU34 – Consultar el promedio de calificaciones como paseador
 * **Identificador:** HU34 | **Rol:** Paseador | **Estimación:** 1 día | **Prioridad:** 33 | **Puntos:** 2
 * **Dependencias:** HU32, HU33
-* **Estado:** **PENDIENTE**
+* **Estado:** **IMPLEMENTADO Y VERIFICADO**
 
 #### Criterios de Aceptación
 1. **Escenario 1 – Visualización del promedio:** Dado que el paseador tiene 1 o más calificaciones, cuando consulte su panel de reputación, el sistema muestra `calificacion_promedio`, `total_calificaciones` y la lista paginada de opiniones visibles ordenadas de la más reciente a la más antigua.
@@ -168,8 +165,8 @@ Migración Flyway creada en `src/main/resources/db/migration/V2.3.0__sprint_4_re
 
 #### Diseño de Implementación Previsto
 * **Endpoints:**
-  * `GET /api-paseape/paseador/calificaciones?page=0&size=10` (panel privado del paseador autenticado).
-  * `GET /api-paseape/paseadores/{uuid}/calificaciones?page=0&size=10` (consulta pública del perfil del paseador para dueños).
+  * `GET /api-paseape/calificaciones/paseador?page=0&size=10` (panel privado del paseador autenticado).
+  * `GET /api-paseape/calificaciones/paseadores/{uuid}?page=0&size=10` (consulta pública del perfil del paseador para dueños).
 * **DTOs:** `ResumenCalificacionesPaseadorResDto` (`paseador_uuid`, `calificacion_promedio`, `total_calificaciones`, `tiene_calificaciones`, `mensaje_estado`, `opiniones: PageResponseDto<OpinionPaseadorResDto>`).
 * **Servicio (`CalificacionService.obtenerCalificacionesPaseador` con `@Transactional(readOnly = true)`):**
   * Lee `calificacion_promedio` y `total_calificaciones` directamente de `Paseador` ($O(1)$).
@@ -262,10 +259,9 @@ Todas las rutas operan bajo `/api-paseape` retornando `ResponseDto<T>`:
 | Método | Endpoint | Rol | Historia | Estado |
 | :--- | :--- | :--- | :--- | :--- |
 | `GET/POST/PUT/DELETE/PATCH` | `/catalogos/{distritos\|tipos-mascota\|razas\|tamanos-mascota\|niveles-energia\|generos-mascota}/...` | `ADMINISTRADOR` | HU41–HU44 | **IMPLEMENTADO** |
-| `POST` | `/cliente/solicitudes/{uuid}/calificacion` | `CLIENTE` | HU32 | **PENDIENTE** |
-| `PATCH` | `/cliente/solicitudes/{uuid}/opinion` | `CLIENTE` | HU33 | **PENDIENTE** |
-| `GET` | `/paseador/calificaciones` | `PASEADOR` | HU34 | **PENDIENTE** |
-| `GET` | `/paseadores/{uuid}/calificaciones` | Autenticado | HU34 | **PENDIENTE** |
+| `POST` | `/calificaciones/solicitudes/{uuid}` | `CLIENTE` | HU32, HU33 | **IMPLEMENTADO** |
+| `GET` | `/calificaciones/paseador` | `PASEADOR` | HU34 | **IMPLEMENTADO** |
+| `GET` | `/calificaciones/paseadores/{uuid}` | Autenticado | HU34 | **IMPLEMENTADO** |
 | `POST` | `/reportes` | `CLIENTE`, `PASEADOR` | Base HU35/36 | **PENDIENTE** |
 | `GET` | `/admin/reportes` | `ADMINISTRADOR` | HU37 | **PENDIENTE** |
 | `GET` | `/admin/reportes/{uuid}` | `ADMINISTRADOR` | HU37 | **PENDIENTE** |
@@ -287,3 +283,54 @@ Todas las rutas operan bajo `/api-paseape` retornando `ResponseDto<T>`:
 6. **Validadores (`infrastructure.validator`):** `try/catch` + `BadRequestException` + `BuildErrorForValidation(...)`.
 7. **Servicios (`application.service`):** Clases concretas (sin interfaz/`Impl`), `@Transactional(rollbackFor = Exception.class)` en escrituras y `@Transactional(readOnly = true)` en lecturas.
 8. **Controladores (`infrastructure.controller`):** Controladores independientes (sin `BaseController`) con `LoggerFactory` y `RequestService`.
+
+---
+
+## 8. Plan de Desarrollo por Bloques y Estado de Avance
+
+| Bloque | Alcance | Dependencias | Estado |
+| :--- | :--- | :--- | :---: |
+| **Base BD y Catálogos** | Migraciones `V2.3.0` y `V2.3.1`, mantenedor `HU41`–`HU44` y diseño Figma Sprint 4 | — | **COMPLETADO** |
+| **Bloque 0 – Base Común y Seguridad** | Constantes en `Constant.java` y restricción de rutas `/admin/**` en `SecurityConfig` | Base BD | **COMPLETADO** |
+| **Bloque 1 – Reputación y Reseñas (`HU32`, `HU33`, `HU34`)** | Calificación 1–5 ★, opinión única, métricas en `Paseador` y paneles público/privado | Bloque 0 | **COMPLETADO** |
+| **Bloque 2 – Sanciones (`HU40`), Penalidades y Cancelación** | Motivos en `/application-parameters`, `SancionService`, `PenalidadService`, `mi-cuenta/estado-sanciones`, filtro JWT y jobs | Bloque 0 | **PENDIENTE** |
+| **Bloque 3 – Reportes e Incidencias (`HU35/36`, `HU37`)** | `POST /reportes` (`multipart/form-data`), bandeja/gestión Admin, seguimiento y penalidad grave | Bloque 2 | **PENDIENTE** |
+| **Bloque 4 – Integración `app-android-paseape`** | Conexión de pantallas Figma (`SCR_S3_05`, `SCR_S4_01`–`08`, modales y drawer Admin) | Bloques 1, 2 y 3 | **PENDIENTE** |
+
+### Detalle de Tareas por Bloque
+
+#### Base BD, Catálogos y Diseño — **COMPLETADO**
+- [x] Migración `V2.3.0__sprint_4_reputacion_reportes_sanciones_schema.sql`.
+- [x] Migración `V2.3.1__tipo_motivo_cancelacion_schema.sql`.
+- [x] Mantenedor administrativo de catálogos (`HU41`–`HU44`).
+- [x] Diseño UI/UX en Figma (página `04. Sprint 4` + actualización de `SCR_S3_05`, `SCR_S3_02`, `SCR_C2` y drawer vertical Admin).
+
+#### Bloque 0: Base Común y Seguridad — **COMPLETADO**
+- [x] Agregar constantes de `tipo_notificacion` (`7`–`11`), `EVIDENCIA_REPORTE` (`5`), `categoria_reporte`, `estado_reporte` y códigos de `tipo_penalidad` en `Constant.java`.
+- [x] Ajustar `SecurityConfig.java` para mantener público solo el registro admin y proteger `/admin/reportes/**`, `/admin/usuarios/**` y `/admin/sanciones/**`.
+
+#### Bloque 1: Reputación y Reseñas (`HU32`, `HU33`, `HU34`) — **COMPLETADO**
+- [x] Dominio, entidad JPA (`PaseoCalificacionEntity`), puerto/adaptador (`IPaseoCalificacionRepository`) y mappers (`Dbo` / `Dto`).
+- [x] `POST /calificaciones/solicitudes/{uuid}` (`HU32`, `HU33`): recálculo en `Paseador`, notificación `CALIFICACION_RECIBIDA` (`7`) y opinión opcional (`5–1000` chars).
+- [x] `GET /calificaciones/paseador` y `GET /calificaciones/paseadores/{uuid}` (`HU34`): resumen $O(1)$ y paginación en hora Lima.
+- [x] Pruebas unitarias (`CalificacionServiceTest`, `CalificacionValidatorTest`).
+
+#### Bloque 2: Sanciones (`HU40`), Penalidades y Cancelación — **PENDIENTE**
+- [ ] Exponer `tipo_motivo_cancelacion` (`V2.3.1`) en `ApplicationParameterService` / `ApplicationParameterController`.
+- [ ] Dominio, entidades JPA, repositorios y mappers para `TipoPenalidad`, `UsuarioPenalidad` y `UsuarioSancion`.
+- [ ] `SancionService` + `SancionValidator` + endpoints Admin (`POST /admin/usuarios/{uuid}/sanciones`, `PATCH /admin/sanciones/{uuid}/levantar`, `GET /admin/usuarios/{uuid}/sanciones`).
+- [ ] Endpoint `GET /mi-cuenta/estado-sanciones` para Cliente y Paseador.
+- [ ] Validación de cuenta `ACTIVO` en `JwtAuthenticationFilter` / `CustomUserDetailsService` y job de desbloqueo automático en `AppTaskScheduler`.
+- [ ] `PenalidadService` (acumulador idempotente y escalamiento) + actualización de `CancelarSolicitudReqDto` (`motivo_cancelacion_id` + `motivo`) y hooks en `SolicitudPaseoService` / `AppTaskScheduler`.
+- [ ] Pruebas unitarias (`SancionServiceTest`, `PenalidadServiceTest`, `SolicitudPaseoServiceTest`).
+
+#### Bloque 3: Reportes e Incidencias (`HU35/36`, `HU37`) — **PENDIENTE**
+- [ ] Dominio, entidades JPA, repositorios y mappers para `CategoriaReporte`, `EstadoReporte`, `ReporteIncidencia` y `ReporteSeguimiento`.
+- [ ] `POST /reportes` (`multipart/form-data`): subida de evidencias vía `DigitalDocumentService` (`5: EVIDENCIA_REPORTE`) y notificación `REPORTE_RECIBIDO` (`8`) a reportante y administradores.
+- [ ] Endpoints Admin `HU37`: `GET /admin/reportes`, `GET /admin/reportes/{uuid}`, `PATCH /admin/reportes/{uuid}/gestionar` (seguimiento, notificación `9` y disparo opcional de `REPORTE_GRAVE_CONFIRMADO`).
+- [ ] Pruebas unitarias (`ReporteServiceTest`, `ReporteValidatorTest`).
+
+#### Bloque 4: Integración en `app-android-paseape` — **PENDIENTE**
+- [ ] Flujo de calificación/opinión en 2 pasos (`SCR_S3_05`), `SCR_S4_01` y `SCR_S4_02`.
+- [ ] Modal de cancelación parametrizado (`MODAL_S4_CancelarServicio`), `SCR_S4_08` + `MODAL_S4_InfoPuntajeAmigable` y `SCR_S4_07`.
+- [ ] Flujo de reportes (`SCR_S4_03`), menú lateral vertical Admin (`OVERLAY_ADM_NavDrawer_Reportes`), `SCR_S4_04`, `SCR_S4_05` y `SCR_S4_06`.

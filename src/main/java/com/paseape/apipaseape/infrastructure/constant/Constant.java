@@ -327,4 +327,51 @@ public class Constant {
     public static final String MSJ_RECORRIDO_OBTENIDO_EXITO = "Recorrido histórico del paseo obtenido exitosamente";
     public static final String MSJ_SOLICITUD_DETALLE_OBTENIDO = "Detalle de la solicitud de paseo obtenido exitosamente";
     public static final String MSJ_ERROR_PASEO_NO_ACTIVO_GPS = "No se puede registrar telemetría porque el paseo no se encuentra en curso.";
+
+    // =========================================================================
+    // SPRINT 4: DOCUMENTOS, NOTIFICACIONES, REPORTES, PENALIDADES Y CALIFICACIONES
+    // =========================================================================
+    public static final int ID_DOC_EVIDENCIA_REPORTE = 5;
+
+    public static final int ID_TIPO_NOTIFICACION_CALIFICACION_RECIBIDA = 7;
+    public static final int ID_TIPO_NOTIFICACION_REPORTE_RECIBIDO = 8;
+    public static final int ID_TIPO_NOTIFICACION_REPORTE_ACTUALIZADO = 9;
+    public static final int ID_TIPO_NOTIFICACION_PENALIDAD_APLICADA = 10;
+    public static final int ID_TIPO_NOTIFICACION_CUENTA_SANCIONADA = 11;
+
+    // CATEGORIA REPORTE
+    public static final int ID_CATEGORIA_REPORTE_MALTRATO = 1;
+    public static final int ID_CATEGORIA_REPORTE_HORARIO = 2;
+    public static final int ID_CATEGORIA_REPORTE_PASEO_INCOMPLETO = 3;
+    public static final int ID_CATEGORIA_REPORTE_COMPORTAMIENTO = 4;
+    public static final int ID_CATEGORIA_REPORTE_PAGO = 5;
+    public static final int ID_CATEGORIA_REPORTE_OTRO = 6;
+
+    // ESTADO REPORTE
+    public static final int ID_ESTADO_REPORTE_PENDIENTE = 1;
+    public static final int ID_ESTADO_REPORTE_EN_REVISION = 2;
+    public static final int ID_ESTADO_REPORTE_RESUELTO = 3;
+    public static final int ID_ESTADO_REPORTE_DESESTIMADO = 4;
+
+    // CODIGOS TIPO PENALIDAD
+    public static final String COD_PENALIDAD_CANCELACION_TARDIA_PASEADOR = "CANCELACION_TARDIA_PASEADOR";
+    public static final String COD_PENALIDAD_CANCELACION_TARDIA_CLIENTE = "CANCELACION_TARDIA_CLIENTE";
+    public static final String COD_PENALIDAD_NO_SHOW_PASEADOR = "NO_SHOW_PASEADOR";
+    public static final String COD_PENALIDAD_NO_SHOW_CLIENTE = "NO_SHOW_CLIENTE";
+    public static final String COD_PENALIDAD_FINALIZACION_ANTICIPADA = "FINALIZACION_ANTICIPADA";
+    public static final String COD_PENALIDAD_TELEMETRIA_INSUFICIENTE = "TELEMETRIA_INSUFICIENTE";
+    public static final String COD_PENALIDAD_REPORTE_GRAVE = "REPORTE_GRAVE_CONFIRMADO";
+
+    // CALIFICACIONES Y OPINIONES (HU32, HU33, HU34)
+    public static final int MIN_PUNTUACION_CALIFICACION = 1;
+    public static final int MAX_PUNTUACION_CALIFICACION = 5;
+    public static final int MIN_LONGITUD_OPINION = 5;
+    public static final int MAX_LONGITUD_OPINION = 1000;
+
+    public static final String TITULO_NOTIF_CALIFICACION_RECIBIDA = "¡Has recibido una nueva calificación!";
+    public static final String MSJ_CALIFICACION_REGISTRADA_EXITO = "Calificación registrada exitosamente";
+    public static final String MSJ_OPINION_REGISTRADA_EXITO = "Opinión registrada exitosamente";
+    public static final String MSJ_CALIFICACIONES_PASEADOR_OBTENIDAS = "Calificaciones del paseador obtenidas exitosamente";
+    public static final String MSJ_PASEADOR_SIN_CALIFICACIONES = "Aún no cuenta con calificaciones registradas.";
+    public static final String MSJ_PASEADOR_CON_CALIFICACIONES = "Resumen de calificaciones obtenido exitosamente.";
 }

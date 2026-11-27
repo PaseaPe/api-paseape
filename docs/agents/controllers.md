@@ -101,6 +101,8 @@ public ResponseEntity<ResponseDto<SolicitudPaseoResDto>> crearSolicitudInmediata
 4. **Usuario autenticado:** Se obtiene como `Principal principal` (o `Authentication authentication`) en los argumentos del método y se pasa el email al servicio (`principal.getName()`). Queda prohibido leer el contexto de seguridad estáticamente mediante `SecurityContextHolder.getContext()`.
 5. **Un endpoint, una sola llamada al servicio:** Si se requiere orquestar múltiples pasos de negocio, se encapsulan dentro de un método en la capa de Servicio.
 6. **Auditoría temporal obligatoria:** Captura `startDatetime` antes de validar y genera el `HeaderDto` con `requestService.getResponseHeader(startDatetime, endDatetime)`.
+7. **Obligatoriedad de `@RequestMapping` a nivel de clase:** Todo controlador debe declarar `@RequestMapping` al inicio de la clase (por ejemplo `@RequestMapping(path = "cliente/solicitudes", produces = "application/json")` o `@RequestMapping(path = "", produces = "application/json")` si agrupa rutas de distintos prefijos).
+8. **Endpoints completos sin métodos auxiliares genéricos:** En todo controlador de negocio, cada endpoint debe contener de forma explícita y completa su flujo `try/catch`, validación, invocación al servicio, armado de `ResponseDto` y `HeaderDto`. No se deben reducir los endpoints extrayendo helpers privados como `buildSuccessResponse`, `buildErrorResponse` o `ejecutarEndpoint`. **Única excepción permitida:** mantenedores CRUD puros de catálogos como `CatalogoController`.
 
 ---
 
@@ -124,6 +126,12 @@ private final ISolicitudPaseoDtoMapper mapper;
 
 // ❌ Uso de @Valid de Jakarta en el RequestBody
 public ResponseEntity<?> save(@Valid @RequestBody CrearSolicitudReqDto dto)
+
+// ❌ Omitir @RequestMapping en la clase o resumir endpoints de negocio con helpers genéricos
+@RestController
+public class NuevoNegocioController {
+    private ResponseEntity<ResponseDto<T>> buildSuccessResponse(...) { ... }
+}
 ```
 
 ---
@@ -131,7 +139,9 @@ public ResponseEntity<?> save(@Valid @RequestBody CrearSolicitudReqDto dto)
 ## Checklist para Controllers
 
 - [ ] La clase es independiente y **no extiende `BaseController`**.
+- [ ] Declara `@RequestMapping` explícito al inicio de la clase.
 - [ ] Logger declarado con la clase propia: `LoggerFactory.getLogger(XController.class)`.
+- [ ] Cada endpoint desarrolla de forma completa su bloque `try/catch` y armado de respuesta sin helpers genéricos (salvo mantenedores puros como `CatalogoController`).
 - [ ] Validador dedicado ejecutado al inicio antes de llamar al servicio.
 - [ ] `HeaderDto` obtenido mediante `requestService.getResponseHeader(start, end)`.
 - [ ] Un solo método del servicio invocado por endpoint.
